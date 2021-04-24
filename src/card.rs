@@ -1,8 +1,23 @@
-use std::cmp::{ Ord, PartialEq, PartialOrd, Ordering };
+use std::cmp::{Ord, Ordering, PartialEq, PartialOrd};
 
-#[derive(Eq, Copy, Clone)]
+#[derive(Eq, Copy, Clone, FromPrimitive, ToPrimitive)]
 pub enum Card {
-    Unknown, Card3, Card4, Card5, Card6, Card7, Card8, Card9, Card10, CardJ, CardQ, CardK, CardA, Card2, CardGhost, CardKing
+    Unknown,
+    Card3,
+    Card4,
+    Card5,
+    Card6,
+    Card7,
+    Card8,
+    Card9,
+    Card10,
+    CardJ,
+    CardQ,
+    CardK,
+    CardA,
+    Card2,
+    CardGhost,
+    CardKing,
 }
 
 impl Ord for Card {
@@ -24,7 +39,7 @@ impl PartialEq for Card {
 }
 
 impl Card {
-    pub fn from_char(card: char) -> Card {
+    pub fn from_char(card: &char) -> Card {
         match card {
             '2' => Card::Card2,
             '3' => Card::Card3,
@@ -41,7 +56,7 @@ impl Card {
             'A' => Card::CardA,
             '鬼' => Card::CardGhost,
             '王' => Card::CardKing,
-            _ => Card::Unknown
+            _ => Card::Unknown,
         }
     }
 
@@ -62,7 +77,7 @@ impl Card {
             Card::CardA => "A",
             Card::CardGhost => "鬼",
             Card::CardKing => "王",
-            _ => ""
+            _ => "",
         }
     }
 
@@ -70,7 +85,7 @@ impl Card {
         *self as u32
     }
 
-    pub fn from_value(i: u32) -> Card {
+    pub fn from_value(i: &u32) -> Card {
         match i {
             1 => Card::Card3,
             2 => Card::Card4,
@@ -87,7 +102,7 @@ impl Card {
             13 => Card::Card2,
             14 => Card::CardGhost,
             15 => Card::CardKing,
-            _ => Card::Unknown
+            _ => Card::Unknown,
         }
     }
 }
@@ -95,7 +110,7 @@ impl Card {
 #[derive(Eq)]
 pub struct CardGroup {
     pub card: Card,
-    pub count: u32
+    pub count: u32,
 }
 
 impl Ord for CardGroup {
@@ -117,7 +132,33 @@ impl PartialEq for CardGroup {
 }
 
 pub struct CardGroups {
-    pub groups: Vec<CardGroup>
+    pub groups: Vec<CardGroup>,
+}
+
+impl CardGroups {
+    pub fn type_len(&self) -> usize {
+        self.groups.len()
+    }
+
+    pub fn card_len(&self) -> usize {
+        let mut size = 0u32;
+        for x in self.groups.iter() {
+            size += x.count;
+        }
+        size as usize
+    }
+
+    pub fn find_group(&self, count: u32) -> Option<&CardGroup> {
+        self.groups.iter().find(|x| x.count == count)
+    }
+
+    pub fn has_group(&self, count: u32) -> bool {
+        self.groups.iter().any(|x| x.count == count)
+    }
+
+    pub fn only_has_group(&self, count: u32) -> bool {
+        self.groups.len() == 1 && self.has_group(count)
+    }
 }
 
 pub fn to_card_groups(vec: &Vec<Card>) -> CardGroups {
@@ -128,9 +169,12 @@ pub fn to_card_groups(vec: &Vec<Card>) -> CardGroups {
     let mut groups = CardGroups { groups: vec![] };
     for i in 0..16 {
         if arr[i as usize] > 0 {
-            groups.groups.push(CardGroup { card: Card::from_value(i), count: arr[i as usize] })
+            groups.groups.push(CardGroup {
+                card: Card::from_value(&i),
+                count: arr[i as usize],
+            })
         }
     }
     groups.groups.sort();
-    return groups
+    return groups;
 }

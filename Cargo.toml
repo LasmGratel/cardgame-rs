@@ -1,10 +1,13 @@
 [package]
-name = "cardgame-rs"
-version = "0.1.0"
 authors = ["Lasm Gratel <lasm_gratel@hotmail.com>"]
 edition = "2018"
+name = "cardgame-rs"
+version = "0.1.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+num-derive = "0.3"
+num-traits = "0.2"
+rand = "*"
 regex = "1"
