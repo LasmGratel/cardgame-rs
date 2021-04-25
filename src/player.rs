@@ -15,3 +15,13 @@ pub struct Player {
     pub cards: Vec<Card>,
     pub player_type: PlayerType,
 }
+
+impl Player {
+    pub fn new(id: u32, score: i64) -> Player {
+        Player {
+            data: PlayerData { id, score },
+            cards: vec![],
+            player_type: PlayerType::Farmer,
+        }
+    }
+}

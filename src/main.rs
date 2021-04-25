@@ -17,6 +17,8 @@ use std::io;
 fn main() {
     println!("Len: {}", gen_cards().len());
 
+    let to_match = parse_input("3334445577");
+
     println!("请出牌：");
     let mut input = String::new();
     io::stdin()
@@ -27,12 +29,13 @@ fn main() {
         print!("[{}]", c.to_string());
     }
     println!();
-    println!("{}", match_rule(cards).to_string());
+    let rule = match_rule(&to_match);
+    println!("{}, {}", rule.to_string(), match_rule(&cards).to_string());
+    println!("{}", rule_matches(&rule, &cards));
 
     let mut game = Game::new();
-    game.players.push(Player {
-        data: PlayerData { id: 1, score: 1 },
-        cards: vec![],
-        player_type: PlayerType::Farmer,
-    });
+    game.players.push(Player::new(114514, 0));
+    game.players.push(Player::new(1919810, 0));
+    game.players.push(Player::new(123456, 0));
+    game.start().expect("Game not started!");
 }

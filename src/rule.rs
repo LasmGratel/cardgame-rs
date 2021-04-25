@@ -1,10 +1,13 @@
 use crate::card::*;
 
 pub trait Rule {
-    fn matches(&self, cards: Vec<Card>) -> bool;
+    fn matches(&self, cards: &Vec<Card>) -> bool;
     fn to_string(&self) -> &str;
     fn is_none(&self) -> bool {
         false
+    }
+    fn bomb_priority(&self) -> u32 {
+        0
     }
 }
 /// 单
@@ -64,7 +67,7 @@ pub struct RuleAirplaneWithTwoWings {
 pub struct RuleNone;
 
 impl Rule for RuleNone {
-    fn matches(&self, cards: Vec<Card>) -> bool {
+    fn matches(&self, cards: &Vec<Card>) -> bool {
         false
     }
     fn to_string(&self) -> &str {
@@ -76,7 +79,7 @@ impl Rule for RuleNone {
 }
 
 impl RuleOne {
-    fn try_new(cards: Vec<Card>) -> Option<RuleOne> {
+    fn try_new(cards: &Vec<Card>) -> Option<RuleOne> {
         if cards.len() == 1 {
             Some(RuleOne { card: cards[0] })
         } else {
@@ -86,7 +89,7 @@ impl RuleOne {
 }
 
 impl Rule for RuleOne {
-    fn matches(&self, cards: Vec<Card>) -> bool {
+    fn matches(&self, cards: &Vec<Card>) -> bool {
         cards.len() == 1 && cards[0] > self.card
     }
     fn to_string(&self) -> &str {
@@ -95,7 +98,7 @@ impl Rule for RuleOne {
 }
 
 impl RuleTwo {
-    fn try_new(cards: Vec<Card>) -> Option<RuleTwo> {
+    fn try_new(cards: &Vec<Card>) -> Option<RuleTwo> {
         let groups = to_card_groups(&cards);
         if groups.only_has_group(2) {
             Some(RuleTwo { card: cards[0] })
@@ -106,7 +109,7 @@ impl RuleTwo {
 }
 
 impl Rule for RuleTwo {
-    fn matches(&self, cards: Vec<Card>) -> bool {
+    fn matches(&self, cards: &Vec<Card>) -> bool {
         let groups = to_card_groups(&cards);
         groups.only_has_group(2) && cards[0] > self.card
     }
@@ -115,7 +118,7 @@ impl Rule for RuleTwo {
     }
 }
 impl RuleThreeWithOne {
-    fn try_new(cards: Vec<Card>) -> Option<RuleThreeWithOne> {
+    fn try_new(cards: &Vec<Card>) -> Option<RuleThreeWithOne> {
         if cards.len() != 4 {
             return None;
         }
@@ -140,7 +143,7 @@ impl RuleThreeWithOne {
     }
 }
 impl Rule for RuleThreeWithOne {
-    fn matches(&self, cards: Vec<Card>) -> bool {
+    fn matches(&self, cards: &Vec<Card>) -> bool {
         let rule = RuleThreeWithOne::try_new(cards);
         return rule.is_some() && rule.unwrap().first > self.first;
     }
@@ -149,7 +152,7 @@ impl Rule for RuleThreeWithOne {
     }
 }
 impl RuleThreeWithTwo {
-    fn try_new(cards: Vec<Card>) -> Option<RuleThreeWithTwo> {
+    fn try_new(cards: &Vec<Card>) -> Option<RuleThreeWithTwo> {
         if cards.len() != 5 {
             return None;
         }
@@ -174,7 +177,7 @@ impl RuleThreeWithTwo {
     }
 }
 impl Rule for RuleThreeWithTwo {
-    fn matches(&self, cards: Vec<Card>) -> bool {
+    fn matches(&self, cards: &Vec<Card>) -> bool {
         let rule = RuleThreeWithTwo::try_new(cards);
         return rule.is_some() && rule.unwrap().first > self.first;
     }
@@ -183,7 +186,7 @@ impl Rule for RuleThreeWithTwo {
     }
 }
 impl RuleFourWithTwo {
-    fn try_new(cards: Vec<Card>) -> Option<RuleFourWithTwo> {
+    fn try_new(cards: &Vec<Card>) -> Option<RuleFourWithTwo> {
         if cards.len() != 6 {
             return None;
         }
@@ -208,7 +211,7 @@ impl RuleFourWithTwo {
     }
 }
 impl Rule for RuleFourWithTwo {
-    fn matches(&self, cards: Vec<Card>) -> bool {
+    fn matches(&self, cards: &Vec<Card>) -> bool {
         let rule = RuleFourWithTwo::try_new(cards);
         return rule.is_some() && rule.unwrap().first > self.first;
     }
@@ -217,7 +220,7 @@ impl Rule for RuleFourWithTwo {
     }
 }
 impl RuleBomb {
-    fn try_new(cards: Vec<Card>) -> Option<RuleBomb> {
+    fn try_new(cards: &Vec<Card>) -> Option<RuleBomb> {
         if cards.len() != 4 {
             return None;
         }
@@ -230,21 +233,24 @@ impl RuleBomb {
     }
 }
 impl Rule for RuleBomb {
-    fn matches(&self, cards: Vec<Card>) -> bool {
+    fn matches(&self, cards: &Vec<Card>) -> bool {
         let rule = RuleBomb::try_new(cards);
         return rule.is_some() && rule.unwrap().card > self.card;
     }
     fn to_string(&self) -> &str {
         "炸弹"
     }
+    fn bomb_priority(&self) -> u32 {
+        1
+    }
 }
 impl RuleRocket {
-    fn try_new(cards: Vec<Card>) -> Option<RuleRocket> {
+    fn try_new(cards: &Vec<Card>) -> Option<RuleRocket> {
         if cards.len() != 2 {
             return None;
         }
         let mut iter = cards.into_iter();
-        if iter.all(|x| x == Card::CardGhost || x == Card::CardKing) {
+        if iter.all(|x| *x == Card::CardGhost || *x == Card::CardKing) {
             Some(RuleRocket)
         } else {
             None
@@ -252,15 +258,18 @@ impl RuleRocket {
     }
 }
 impl Rule for RuleRocket {
-    fn matches(&self, cards: Vec<Card>) -> bool {
+    fn matches(&self, cards: &Vec<Card>) -> bool {
         false // TODO 双副牌
     }
     fn to_string(&self) -> &str {
         "火箭"
     }
+    fn bomb_priority(&self) -> u32 {
+        2
+    }
 }
 impl RuleChain {
-    fn try_new(cards: Vec<Card>) -> Option<RuleChain> {
+    fn try_new(cards: &Vec<Card>) -> Option<RuleChain> {
         let groups = to_card_groups(&cards);
         let first = groups.groups.first();
         if first.is_none() {
@@ -298,13 +307,13 @@ impl RuleChain {
             _ => return None,
         }
         return Some(RuleChain {
-            first: card,
+            first: first.card,
             count: type_len,
         });
     }
 }
 impl Rule for RuleChain {
-    fn matches(&self, cards: Vec<Card>) -> bool {
+    fn matches(&self, cards: &Vec<Card>) -> bool {
         let rule = RuleChain::try_new(cards);
         if rule.is_none() {
             return false;
@@ -317,7 +326,7 @@ impl Rule for RuleChain {
     }
 }
 impl RuleAirplaneWithOneWing {
-    fn try_new(cards: Vec<Card>) -> Option<RuleAirplaneWithOneWing> {
+    fn try_new(cards: &Vec<Card>) -> Option<RuleAirplaneWithOneWing> {
         let groups = to_card_groups(&cards);
         if groups.type_len() < 4 {
             return None;
@@ -357,7 +366,7 @@ impl RuleAirplaneWithOneWing {
     }
 }
 impl Rule for RuleAirplaneWithOneWing {
-    fn matches(&self, cards: Vec<Card>) -> bool {
+    fn matches(&self, cards: &Vec<Card>) -> bool {
         let rule = RuleAirplaneWithOneWing::try_new(cards);
         if rule.is_none() {
             return false;
@@ -370,7 +379,7 @@ impl Rule for RuleAirplaneWithOneWing {
     }
 }
 impl RuleAirplaneWithTwoWings {
-    fn try_new(cards: Vec<Card>) -> Option<RuleAirplaneWithTwoWings> {
+    fn try_new(cards: &Vec<Card>) -> Option<RuleAirplaneWithTwoWings> {
         let groups = to_card_groups(&cards);
         if groups.type_len() < 4 {
             return None;
@@ -412,8 +421,8 @@ impl RuleAirplaneWithTwoWings {
     }
 }
 impl Rule for RuleAirplaneWithTwoWings {
-    fn matches(&self, cards: Vec<Card>) -> bool {
-        let rule = RuleAirplaneWithOneWing::try_new(cards);
+    fn matches(&self, cards: &Vec<Card>) -> bool {
+        let rule = RuleAirplaneWithTwoWings::try_new(cards);
         if rule.is_none() {
             return false;
         }
@@ -425,53 +434,53 @@ impl Rule for RuleAirplaneWithTwoWings {
     }
 }
 
-pub fn match_rule(cards: Vec<Card>) -> Box<dyn Rule> {
-    let option = RuleOne::try_new(cards.clone());
+pub fn match_rule(cards: &Vec<Card>) -> Box<dyn Rule> {
+    let option = RuleOne::try_new(&cards);
     if option.is_some() {
         return Box::new(option.unwrap());
     }
 
-    let option = RuleTwo::try_new(cards.clone());
+    let option = RuleTwo::try_new(&cards);
     if option.is_some() {
         return Box::new(option.unwrap());
     }
 
-    let option = RuleThreeWithOne::try_new(cards.clone());
+    let option = RuleThreeWithOne::try_new(&cards);
     if option.is_some() {
         return Box::new(option.unwrap());
     }
 
-    let option = RuleThreeWithTwo::try_new(cards.clone());
+    let option = RuleThreeWithTwo::try_new(&cards);
     if option.is_some() {
         return Box::new(option.unwrap());
     }
 
-    let option = RuleFourWithTwo::try_new(cards.clone());
+    let option = RuleFourWithTwo::try_new(&cards);
     if option.is_some() {
         return Box::new(option.unwrap());
     }
 
-    let option = RuleBomb::try_new(cards.clone());
+    let option = RuleBomb::try_new(&cards);
     if option.is_some() {
         return Box::new(option.unwrap());
     }
 
-    let option = RuleRocket::try_new(cards.clone());
+    let option = RuleRocket::try_new(&cards);
     if option.is_some() {
         return Box::new(option.unwrap());
     }
 
-    let option = RuleChain::try_new(cards.clone());
+    let option = RuleChain::try_new(&cards);
     if option.is_some() {
         return Box::new(option.unwrap());
     }
 
-    let option = RuleAirplaneWithOneWing::try_new(cards.clone());
+    let option = RuleAirplaneWithOneWing::try_new(&cards);
     if option.is_some() {
         return Box::new(option.unwrap());
     }
 
-    let option = RuleAirplaneWithTwoWings::try_new(cards.clone());
+    let option = RuleAirplaneWithTwoWings::try_new(&cards);
     if option.is_some() {
         return Box::new(option.unwrap());
     }
@@ -479,12 +488,23 @@ pub fn match_rule(cards: Vec<Card>) -> Box<dyn Rule> {
     return Box::new(RuleNone);
 }
 
+pub fn rule_matches(rule: &Box<dyn Rule>, to_match: &Vec<Card>) -> bool {
+    let to_rule = match_rule(to_match);
+    if rule.is_none() && !to_rule.is_none() {
+        true
+    } else if to_rule.bomb_priority() > rule.bomb_priority() {
+        true
+    } else {
+        rule.matches(to_match)
+    }
+}
+
 /*
 impl Rule<Rule> for Rule {
-    fn matches(&self, cards: Vec<Card>) -> bool {
+    fn matches(&self, cards: &Vec<Card>) -> bool {
         let groups = to_card_groups(&cards);
     }
-    fn try_new(cards: Vec<Card>) -> Option<Rule> {
+    fn try_new(cards: &Vec<Card>) -> Option<Rule> {
         let groups = to_card_groups(&cards);
     }
 }
