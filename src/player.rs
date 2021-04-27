@@ -5,6 +5,7 @@ pub struct PlayerData {
     pub score: i64,
 }
 
+#[derive(PartialEq)]
 pub enum PlayerType {
     Farmer,
     Landlord,

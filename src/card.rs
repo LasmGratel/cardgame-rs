@@ -107,7 +107,7 @@ impl Card {
     }
 }
 
-#[derive(Eq)]
+#[derive(Eq, Clone)]
 pub struct CardGroup {
     pub card: Card,
     pub count: u32,
@@ -131,6 +131,37 @@ impl PartialEq for CardGroup {
     }
 }
 
+impl CardGroup {
+    pub fn to_cards(self) -> Vec<Card> {
+        vec![self.card; self.count as usize]
+    }
+}
+
+impl std::ops::Sub<CardGroups> for CardGroups {
+    type Output = Option<CardGroups>;
+    fn sub(self, rhs: CardGroups) -> Option<CardGroups> {
+        if self.type_len() < rhs.type_len() {
+            return None;
+        }
+        let mut groups = CardGroups {
+            groups: self.groups.clone(),
+        };
+        for c in groups.groups.iter_mut() {
+            let group = rhs.find_group_by_card(c.card);
+            if group.is_some() {
+                let group = group.unwrap();
+                if c.count < group.count {
+                    return None;
+                }
+                c.count -= group.count;
+            }
+        }
+        groups.groups.retain(|x| x.count > 0);
+        groups.groups.sort();
+        Some(groups)
+    }
+}
+
 pub struct CardGroups {
     pub groups: Vec<CardGroup>,
 }
@@ -148,8 +179,12 @@ impl CardGroups {
         size as usize
     }
 
-    pub fn find_group(&self, count: u32) -> Option<&CardGroup> {
+    pub fn find_group_by_count(&self, count: u32) -> Option<&CardGroup> {
         self.groups.iter().find(|x| x.count == count)
+    }
+
+    pub fn find_group_by_card(&self, card: Card) -> Option<&CardGroup> {
+        self.groups.iter().find(|x| x.card == card)
     }
 
     pub fn has_group(&self, count: u32) -> bool {
@@ -158,6 +193,10 @@ impl CardGroups {
 
     pub fn only_has_group(&self, count: u32) -> bool {
         self.groups.len() == 1 && self.has_group(count)
+    }
+
+    pub fn to_cards(self) -> Vec<Card> {
+        self.groups.into_iter().flat_map(|x| x.to_cards()).collect()
     }
 }
 

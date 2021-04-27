@@ -1,0 +1,5 @@
+[package]
+authors = ["Lasm Gratel <lasm_gratel@hotmail.com>"]
+edition = "2018"
+name = "cardgame-client-console"
+version = "0.1.0"

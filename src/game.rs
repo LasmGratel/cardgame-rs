@@ -21,6 +21,9 @@ pub struct Game {
     pub last_cards: Vec<Card>,
     pub landlord_cards: Vec<Card>,
     pub last_rule: Box<dyn Rule>,
+
+    /// 最后出牌的玩家
+    pub last_index: usize,
 }
 
 impl Game {
@@ -30,6 +33,7 @@ impl Game {
             state: GameState::WaitingForPlayers,
             index: 0,
             landlord_index: 0,
+            last_index: 0,
             last_cards: vec![],
             landlord_cards: vec![],
             last_rule: Box::new(RuleNone),
@@ -56,6 +60,13 @@ impl Game {
         }
     }
 
+    pub fn move_landlord_index(&mut self) {
+        self.landlord_index += 1;
+        if self.landlord_index > 2 {
+            self.landlord_index = 0;
+        }
+    }
+
     pub fn print_cards(&self) {
         for p in self.players.iter() {
             print!("{}: ", p.data.id);
@@ -68,6 +79,13 @@ impl Game {
 
     pub fn print_player(&self) {
         println!("轮到 {} 出牌", self.current_player().data.id);
+    }
+
+    pub fn print_landlord(&self) {
+        println!(
+            "{} 你要叫地主吗？",
+            self.players[self.landlord_index].data.id
+        )
     }
 
     pub fn start(&mut self) -> Result<(), &str> {
@@ -97,21 +115,67 @@ impl Game {
         Ok(())
     }
 
-    pub fn submit_cards(&mut self, cards: Vec<Card>) -> bool {
-        if self.current_player().cards.inter
-        let rule = match_rule(&cards);
-        if rule_matches(&self.last_rule, &cards) {
-            self.last_rule = rule;
-            self.last_cards = cards;
-            for c in cards.iter() {
-                if let Some(pos) = vec.iter().position(|x| *x == needle) {
-                    vec.remove(pos);
+    pub fn win(&mut self) {
+        match self.current_player().player_type {
+            PlayerType::Landlord => {
+                println!("{} 赢了！", self.current_player().data.id);
+            }
+            PlayerType::Farmer => {
+                for p in self
+                    .players
+                    .iter()
+                    .filter(|x| x.player_type == PlayerType::Farmer)
+                {
+                    println!("{} 赢了！", self.current_player().data.id);
                 }
             }
-            self.move_index();
-            true
+        }
+        self.print_cards();
+        self.state = GameState::WaitingForPlayers;
+    }
+
+    pub fn pass(&mut self) -> Result<(), &str> {
+        if self.state != GameState::Running {
+            Ok(())
+        } else if self.index == self.last_index {
+            Err("过你马呢，该你出牌了")
         } else {
-            false
+            self.move_index();
+            self.print_player();
+            Ok(())
+        }
+    }
+
+    pub fn submit_cards(&mut self, cards: Vec<Card>) -> Result<(), &str> {
+        let rule = match_rule(&cards);
+        if rule_matches(&self.last_rule, &cards) {
+            let option = to_card_groups(&self.current_player().cards) - to_card_groups(&cards);
+            if option.is_none() {
+                return Err("你手里没有这些牌！");
+            }
+            print!("{} 出牌：", self.current_player().data.id);
+            for c in cards.iter() {
+                print!("[{}]", c.to_string());
+            }
+            println!();
+
+            // 赢得胜利
+            if self.current_player().cards.is_empty() {
+                self.win();
+                return Ok(());
+            }
+
+            self.players[self.index].cards = option.unwrap().to_cards();
+            self.last_rule = rule;
+            self.last_cards = cards;
+            self.last_index = self.index;
+            self.move_index();
+
+            self.print_cards();
+            self.print_player();
+            Ok(())
+        } else {
+            Err("你出的牌不符合规则！")
         }
     }
 
@@ -123,7 +187,20 @@ impl Game {
             return Err("游戏已经开始!");
         }
 
+        // 发地主牌
         self.index = self.landlord_index;
+        self.last_index = self.landlord_index;
+        for c in self.landlord_cards.iter() {
+            self.players[self.index].cards.push(*c);
+        }
+        self.players[self.index].cards.sort();
+        self.players[self.index].player_type = PlayerType::Landlord;
+
+        self.state = GameState::Running;
+
+        // 显示信息
+        self.print_cards();
+        self.print_player();
 
         Ok(())
     }

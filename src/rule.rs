@@ -124,13 +124,13 @@ impl RuleThreeWithOne {
         }
 
         let groups = to_card_groups(&cards);
-        let first = groups.find_group(3);
+        let first = groups.find_group_by_count(3);
         if first.is_none() {
             return None;
         }
         let first = first.unwrap();
 
-        let second = groups.find_group(1);
+        let second = groups.find_group_by_count(1);
         if second.is_none() {
             return None;
         }
@@ -158,13 +158,13 @@ impl RuleThreeWithTwo {
         }
 
         let groups = to_card_groups(&cards);
-        let first = groups.find_group(3);
+        let first = groups.find_group_by_count(3);
         if first.is_none() {
             return None;
         }
         let first = first.unwrap();
 
-        let second = groups.find_group(2);
+        let second = groups.find_group_by_count(2);
         if second.is_none() {
             return None;
         }
@@ -192,13 +192,13 @@ impl RuleFourWithTwo {
         }
 
         let groups = to_card_groups(&cards);
-        let first = groups.find_group(4);
+        let first = groups.find_group_by_count(4);
         if first.is_none() {
             return None;
         }
         let first = first.unwrap();
 
-        let second = groups.find_group(2);
+        let second = groups.find_group_by_count(2);
         if second.is_none() {
             return None;
         }
