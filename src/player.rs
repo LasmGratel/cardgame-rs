@@ -1,5 +1,7 @@
 use crate::card::Card;
+use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize)]
 pub struct PlayerData {
     pub id: u32,
     pub score: i64,

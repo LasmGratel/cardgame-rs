@@ -1,20 +1,39 @@
 #[macro_use]
 extern crate num_derive;
-
+extern crate bincode;
+#[macro_use]
+extern crate log;
+extern crate message_io;
+extern crate rand;
 extern crate regex;
+#[macro_use]
+extern crate uuid;
 
 mod card;
+mod client;
 mod game;
+mod messages;
 mod player;
 mod rule;
+mod server;
 
 use card::*;
+use client::client::run_client;
 use game::*;
+use messages::*;
 use player::*;
-use rule::*;
+use server::server::run_server;
 use std::io;
+use std::net::SocketAddr;
+use std::time::Duration;
 
-fn main() {
+pub enum Signal {
+    // This is a self event called every second.
+    Greet,
+    // Other signals here,
+}
+
+fn run() {
     println!("Len: {}", gen_cards().len());
 
     let mut game = Game::new();
@@ -63,6 +82,17 @@ fn main() {
         }
         if game.state == GameState::WaitingForPlayers {
             break;
+        }
+    }
+}
+
+fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() == 2 {
+        match args[1].as_str().trim() {
+            "server" => run_server(),
+            "client" => run_client(),
+            _ => {}
         }
     }
 }
