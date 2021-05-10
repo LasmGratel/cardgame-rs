@@ -1,5 +1,6 @@
 use std::cmp::{Ord, Ordering, PartialEq, PartialOrd};
 use num_derive::{FromPrimitive, ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive};
 
 #[derive(Eq, Copy, Clone, FromPrimitive, ToPrimitive)]
 pub enum Card {
@@ -83,28 +84,11 @@ impl Card {
     }
 
     pub fn value(&self) -> u32 {
-        *self as u32
+        self.to_u32().unwrap_or(0)
     }
 
-    pub fn from_value(i: &u32) -> Card {
-        match i {
-            1 => Card::Card3,
-            2 => Card::Card4,
-            3 => Card::Card5,
-            4 => Card::Card6,
-            5 => Card::Card7,
-            6 => Card::Card8,
-            7 => Card::Card9,
-            8 => Card::Card10,
-            9 => Card::CardJ,
-            10 => Card::CardQ,
-            11 => Card::CardK,
-            12 => Card::CardA,
-            13 => Card::Card2,
-            14 => Card::CardGhost,
-            15 => Card::CardKing,
-            _ => Card::Unknown,
-        }
+    pub fn from_value(i: u32) -> Card {
+        return Card::from_u32(i).unwrap_or(Card::Unknown);
     }
 }
 
@@ -210,7 +194,7 @@ pub fn to_card_groups(vec: &Vec<Card>) -> CardGroups {
     for i in 0..16 {
         if arr[i as usize] > 0 {
             groups.groups.push(CardGroup {
-                card: Card::from_value(&i),
+                card: Card::from_value(i),
                 count: arr[i as usize],
             })
         }

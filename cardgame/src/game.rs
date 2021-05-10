@@ -210,7 +210,7 @@ pub fn gen_cards() -> Vec<Card> {
     let mut cards: Vec<Card> = vec![];
     for i in 1..14 {
         for _ in 0..4 {
-            cards.push(Card::from_value(&i));
+            cards.push(Card::from_value(i));
         }
     }
     cards.push(Card::CardGhost);
