@@ -1,10 +1,10 @@
-use crate::messages::*;
+use cardgame::messages::*;
 use message_io::network::*;
 use message_io::node;
 use message_io::node::*;
 use std::time::Duration;
 
-pub fn run_server() {
+pub fn main() {
     // Create a node, the main message-io entity. It is divided in 2 parts:
     // The 'handler', used to make actions (connect, send messages, signals, stop the node...)
     // The 'listener', used to read events from the network or signals.
@@ -51,9 +51,7 @@ pub fn run_server() {
         });
     });
 
-    let console_handle = std::thread::spawn(|| {
-        
-    });
+    network_handle.join();
 }
 
 fn get_line(prompt: &str) -> String {

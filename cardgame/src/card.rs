@@ -1,4 +1,5 @@
 use std::cmp::{Ord, Ordering, PartialEq, PartialOrd};
+use num_derive::{FromPrimitive, ToPrimitive};
 
 #[derive(Eq, Copy, Clone, FromPrimitive, ToPrimitive)]
 pub enum Card {
