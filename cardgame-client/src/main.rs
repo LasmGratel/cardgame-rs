@@ -1,43 +1,39 @@
 extern crate cardgame;
 
-use cardgame::*;
 use cardgame::messages::*;
+use cardgame::Signal;
+use cardgame::*;
 use message_io::network::*;
 use message_io::node;
 use message_io::node::*;
-use std::time::Duration;
-use std::sync::mpsc;
 use std::io;
+use std::sync::mpsc::*;
 use std::thread::JoinHandle;
-use cardgame::Signal;
+use std::time::Duration;
 
-fn run_network_thread(server_id: Endpoint, handler: NodeHandler<Signal>, listener: NodeListener<Signal>) -> JoinHandle<()> {
+fn run_network_thread(
+    server_id: Endpoint,
+    handler: NodeHandler<Signal>,
+    listener: NodeListener<Signal>,
+    sender: Sender<S2CMessage>,
+) -> JoinHandle<()> {
     std::thread::spawn(move || {
         listener.for_each(move |event| match event {
             NodeEvent::Signal(signal) => match signal {
                 crate::Signal::Greet => {
+                    /*
                     let message = C2SMessage::Ping;
                     let output_data = bincode::serialize(&message).unwrap();
                     handler.network().send(server_id, &output_data);
                     handler
                         .signals()
-                        .send_with_timer(crate::Signal::Greet, Duration::from_secs(1));
+                        .send_with_timer(crate::Signal::Greet, Duration::from_secs(1));*/
                 }
             },
             NodeEvent::Network(net_event) => match net_event {
                 NetEvent::Message(_, input_data) => {
                     let message: S2CMessage = bincode::deserialize(&input_data).unwrap();
-                    match message {
-                        S2CMessage::Pong => {
-                            println!("Pong from server")
-                        }
-                        S2CMessage::Pu => {
-                            println!("Pu!")
-                        }
-                        _ => {
-                            println!("Unknown message")
-                        }
-                    }
+                    sender.send(message).expect("Cannot send message");
                 }
                 NetEvent::Connected(_, _) => unreachable!(), // Only generated when a listener accepts
                 NetEvent::Disconnected(_) => {
@@ -49,18 +45,68 @@ fn run_network_thread(server_id: Endpoint, handler: NodeHandler<Signal>, listene
     })
 }
 
-fn run_console_thread(server_id: Endpoint, handler: NodeHandler<Signal>) -> JoinHandle<()> {
-    std::thread::spawn(move || {
-        loop {
-            let mut line = String::new();
-            std::io::stdin().read_line(&mut line).expect("Invalid input");
+fn read_line(prompt: &str) -> String {
+    let mut line = String::new();
+    loop {
+        println!("{}", prompt);
+        std::io::stdin()
+            .read_line(&mut line)
+            .expect("Invalid input");
 
+        if !line.trim().is_empty() {
+            break;
+        }
+    }
+    line
+}
+
+fn run_console_thread(
+    server_id: Endpoint,
+    handler: NodeHandler<Signal>,
+    rx: Receiver<S2CMessage>,
+) -> JoinHandle<()> {
+    std::thread::spawn(move || {
+        let line = read_line("请输入用户名：");
+        let line = line.trim();
+        if line == "exit" {
+            return;
+        }
+        let data = bincode::serialize(&C2SMessage::Login(String::from(line))).unwrap();
+        handler.network().send(server_id.clone(), &data);
+        let msg = rx.recv().unwrap();
+        match msg {
+            S2CMessage::LoggedIn => {
+                println!("Logged in!");
+            }
+            _ => {
+                println!("Unknown message from server");
+                return;
+            }
+        }
+        loop {
+            let line = read_line("请输入用户名：");
             let line = line.trim();
             if line == "exit" {
-                break;
+                return;
             }
 
-            handler.network().send(server_id.clone(), line.as_bytes());
+            match line {
+                "游戏列表" => {
+                    let data = bincode::serialize(&C2SMessage::QueryLobbyList).unwrap();
+                    handler.network().send(server_id.clone(), &data);
+                    let msg = rx.recv().unwrap();
+                    if let S2CMessage::LobbyList(lobbies) = msg {
+                        for name in lobbies.iter() {
+                            print!("{}, ", name)
+                        }
+                    } else {
+                        println!("无法获取游戏列表")
+                    }
+                }
+                _ => {
+                    println!("未知指令");
+                }
+            }
         }
     })
 }
@@ -143,6 +189,8 @@ fn main() {
 
     handler.signals().send(crate::Signal::Greet);
 
-    run_network_thread(server_id.clone(), handler.clone(), listener);
-    run_console_thread(server_id.clone(), handler.clone()).join();
+    let (tx, rx) = channel();
+
+    run_network_thread(server_id.clone(), handler.clone(), listener, tx);
+    run_console_thread(server_id.clone(), handler.clone(), rx).join();
 }

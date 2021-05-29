@@ -7,6 +7,8 @@ pub enum S2CMessage {
     UpdateData(PlayerData),
     Pong,
     Pu,
+    LoggedIn,
+    LobbyList(Vec<String>),
 }
 
 #[derive(Serialize, Deserialize)]
@@ -14,5 +16,6 @@ pub enum C2SMessage {
     SubmitCards(Vec<u8>),
     ChooseLandlord,
     Ping,
-    Ha,
+    Login(String),
+    QueryLobbyList,
 }

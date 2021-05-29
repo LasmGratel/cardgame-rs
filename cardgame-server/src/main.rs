@@ -1,7 +1,8 @@
-use cardgame::messages::*;
+use cardgame::*;
 use message_io::network::*;
 use message_io::node;
 use message_io::node::*;
+use std::collections::HashMap;
 use std::time::Duration;
 
 pub fn main() {
@@ -16,7 +17,9 @@ pub fn main() {
         .listen(Transport::FramedTcp, "0.0.0.0:3042")
         .unwrap();
 
+    let mut lobby = Lobby::new();
     let mut clients: Vec<Endpoint> = vec![];
+    let mut client_map: HashMap<String, Endpoint> = HashMap::new();
 
     let network_handle = std::thread::spawn(|| {
         // Read incoming network events.
@@ -31,8 +34,21 @@ pub fn main() {
                     C2SMessage::Ping => {
                         println!("Ping from client")
                     }
-                    C2SMessage::Ha => {
-                        println!("Ha!")
+                    C2SMessage::Login(username) => {
+                        println!("User {} Logged in", username);
+                        if client_map.keys().find(|x| **x == username).is_none() {
+                            lobby.users.push(LobbyUser {
+                                name: username.clone(),
+                            });
+                            client_map.insert(username, endpoint);
+                            let to_send = bincode::serialize(&S2CMessage::LoggedIn).unwrap();
+                            handler.network().send(endpoint, &to_send);
+                        }
+                    }
+                    C2SMessage::QueryLobbyList => {
+                        let data: Vec<String> = lobby.table.keys().map(|x| x.to_string()).collect();
+                        let to_send = bincode::serialize(&S2CMessage::LobbyList(data)).unwrap();
+                        handler.network().send(endpoint, &to_send);
                     }
                     _ => {
                         println!("Unknown message")
