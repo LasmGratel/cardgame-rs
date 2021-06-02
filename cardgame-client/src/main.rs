@@ -66,6 +66,7 @@ fn run_console_thread(
     rx: Receiver<S2CMessage>,
 ) -> JoinHandle<()> {
     std::thread::spawn(move || {
+        let mut current_room = String::new();
         let line = read_line("请输入用户名：");
         let line = line.trim();
         if line == "exit" {
@@ -84,40 +85,84 @@ fn run_console_thread(
             }
         }
         loop {
-            let line = read_line("请输入用户名：");
+            let line = read_line("请输入命令：");
             let line = line.trim();
             if line == "exit" {
                 return;
             }
 
-            match line {
-                "游戏列表" => {
-                    let data = bincode::serialize(&C2SMessage::QueryLobbyList).unwrap();
+            if line.starts_with("加入 ") {
+                let room = line.trim_start_matches("加入 ");
+                if !current_room.is_empty() {
+                    println!("你已经在 {} 房间了！", current_room);
+                } else {
+                    println!("尝试加入: {}", room);
+                    let data =
+                        bincode::serialize(&C2SMessage::JoinRoom(String::from(room))).unwrap();
                     handler.network().send(server_id.clone(), &data);
                     let msg = rx.recv().unwrap();
-                    if let S2CMessage::LobbyList(lobbies) = msg {
-                        for name in lobbies.iter() {
-                            print!("{}, ", name)
-                        }
-                    } else {
-                        println!("无法获取游戏列表")
+                    if let S2CMessage::RoomJoined = msg {
+                        println!("成功加入：{}", room);
+                        current_room = String::from(room);
+                    } else if let S2CMessage::RoomFull = msg {
+                        println!("房间已满");
                     }
                 }
-                _ => {
-                    println!("未知指令");
+            } else {
+                match line {
+                    "开始游戏" => {
+                        if current_room.is_empty() {
+                            println!("你还没加入一个房间！");
+                        } else {
+                            let data =
+                                bincode::serialize(&C2SMessage::StartGame(current_room.clone()))
+                                    .unwrap();
+                            handler.network().send(server_id.clone(), &data);
+                            let msg = rx.recv().unwrap();
+                            if let S2CMessage::GameStarted(cards) = msg {
+                                println!("开始游戏！");
+                                print!("您的手牌：");
+                                print_cards(&cards);
+                            } else if let S2CMessage::GameNotStarted(reason) = msg {
+                                println!("游戏未开始，原因：{}", reason);
+                            }
+                        }
+                    }
+                    "游戏列表" => {
+                        let data = bincode::serialize(&C2SMessage::QueryRoomList).unwrap();
+                        handler.network().send(server_id.clone(), &data);
+                        let msg = rx.recv().unwrap();
+                        if let S2CMessage::RoomList(lobbies) = msg {
+                            for name in lobbies.iter() {
+                                print!("{}, ", name)
+                            }
+                        } else {
+                            println!("无法获取游戏列表")
+                        }
+                    }
+                    _ => {
+                        println!("未知指令");
+                    }
                 }
             }
         }
     })
 }
 
+fn print_cards(cards: &Vec<Card>) {
+    for c in cards.iter() {
+        print!("[{}]", c.to_string());
+    }
+    println!();
+}
+
 fn run() {
     println!("Len: {}", gen_cards().len());
 
     let mut game = Game::new();
-    game.players.push(Player::new(114514, 0));
-    game.players.push(Player::new(1919810, 0));
-    game.players.push(Player::new(123456, 0));
+    game.players.push(Player::new(String::from("114514"), 0));
+    game.players.push(Player::new(String::from("1919810"), 0));
+    game.players.push(Player::new(String::from("123456"), 0));
     game.start().expect("Game not started!");
     loop {
         game.print_landlord();

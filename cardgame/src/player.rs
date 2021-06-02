@@ -1,18 +1,19 @@
 use crate::card::Card;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq)]
 pub struct PlayerData {
-    pub id: u32,
+    pub id: String,
     pub score: i64,
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Serialize, Deserialize)]
 pub enum PlayerType {
     Farmer,
     Landlord,
 }
 
+#[derive(Serialize, Deserialize, PartialEq)]
 pub struct Player {
     pub data: PlayerData,
     pub cards: Vec<Card>,
@@ -20,7 +21,7 @@ pub struct Player {
 }
 
 impl Player {
-    pub fn new(id: u32, score: i64) -> Player {
+    pub fn new(id: String, score: i64) -> Player {
         Player {
             data: PlayerData { id, score },
             cards: vec![],

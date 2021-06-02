@@ -1,8 +1,8 @@
+use bimap::BiHashMap;
 use cardgame::*;
 use message_io::network::*;
 use message_io::node;
 use message_io::node::*;
-use std::collections::HashMap;
 use std::time::Duration;
 
 pub fn main() {
@@ -19,7 +19,7 @@ pub fn main() {
 
     let mut lobby = Lobby::new();
     let mut clients: Vec<Endpoint> = vec![];
-    let mut client_map: HashMap<String, Endpoint> = HashMap::new();
+    let mut client_map: BiHashMap<String, Endpoint> = BiHashMap::new();
 
     let network_handle = std::thread::spawn(|| {
         // Read incoming network events.
@@ -36,7 +36,7 @@ pub fn main() {
                     }
                     C2SMessage::Login(username) => {
                         println!("User {} Logged in", username);
-                        if client_map.keys().find(|x| **x == username).is_none() {
+                        if client_map.left_values().find(|x| **x == username).is_none() {
                             lobby.users.push(LobbyUser {
                                 name: username.clone(),
                             });
@@ -45,9 +45,69 @@ pub fn main() {
                             handler.network().send(endpoint, &to_send);
                         }
                     }
-                    C2SMessage::QueryLobbyList => {
-                        let data: Vec<String> = lobby.table.keys().map(|x| x.to_string()).collect();
-                        let to_send = bincode::serialize(&S2CMessage::LobbyList(data)).unwrap();
+                    C2SMessage::JoinRoom(room_name) => {
+                        if !lobby.rooms.contains_key(&room_name) {
+                            lobby.rooms.insert(
+                                room_name.clone(),
+                                Room {
+                                    name: room_name.clone(),
+                                    users: vec![],
+                                },
+                            );
+                            println!("创建房间: {}", room_name)
+                        }
+                        let room = lobby.rooms.get_mut(&room_name).unwrap();
+                        if room.users.len() < 3 {
+                            let user_name = client_map.get_by_right(&endpoint).unwrap().clone();
+                            room.users.push(LobbyUser {
+                                name: user_name.clone(),
+                            });
+                            let to_send = bincode::serialize(&S2CMessage::RoomJoined).unwrap();
+                            handler.network().send(endpoint, &to_send);
+                            println!(
+                                "{} 加入 {} 房间，共有 {} 人",
+                                user_name,
+                                room_name,
+                                room.users.len()
+                            );
+                        } else {
+                            println!("房间已满: {}", room_name);
+                            let to_send = bincode::serialize(&S2CMessage::RoomFull).unwrap();
+                            handler.network().send(endpoint, &to_send);
+                        }
+                    }
+                    C2SMessage::StartGame(room_name) => {
+                        if !lobby.rooms.contains_key(&room_name)
+                            || lobby.rooms.get(&room_name).unwrap().users.len() != 3
+                        {
+                            let to_send = bincode::serialize(&S2CMessage::GameNotStarted(
+                                String::from("房间不存在或未满！"),
+                            ))
+                            .unwrap();
+                            handler.network().send(endpoint, &to_send);
+                        } else {
+                            let mut game = Game::new();
+                            let room: &Room = lobby.rooms.get(&room_name).unwrap();
+                            game.players = room
+                                .users
+                                .iter()
+                                .map(|x| Player::new(x.name.clone(), 0))
+                                .collect();
+                            game.start().expect("Game failed to start!");
+                            for p in game.players.iter() {
+                                let to_send =
+                                    bincode::serialize(&S2CMessage::GameStarted(p.cards.clone()))
+                                        .unwrap();
+                                handler.network().send(
+                                    client_map.get_by_left(&p.data.id).unwrap().clone(),
+                                    &to_send,
+                                );
+                            }
+                        }
+                    }
+                    C2SMessage::QueryRoomList => {
+                        let data: Vec<String> = lobby.rooms.keys().map(|x| x.to_string()).collect();
+                        let to_send = bincode::serialize(&S2CMessage::RoomList(data)).unwrap();
                         handler.network().send(endpoint, &to_send);
                     }
                     _ => {
@@ -57,12 +117,12 @@ pub fn main() {
             }
             NetEvent::Disconnected(endpoint) => {
                 println!("{} Disconnected", endpoint);
-                clients.remove(
-                    clients
-                        .iter()
-                        .position(|x| *x == endpoint)
-                        .expect("No such client found"),
-                );
+                let client = clients
+                    .iter()
+                    .position(|x| *x == endpoint)
+                    .expect("No such client found");
+                clients.remove(client);
+                client_map.remove_by_right(&endpoint);
             }
         });
     });

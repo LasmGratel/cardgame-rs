@@ -1,8 +1,9 @@
-use std::cmp::{Ord, Ordering, PartialEq, PartialOrd};
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
+use serde::{Deserialize, Serialize};
+use std::cmp::{Ord, Ordering, PartialEq, PartialOrd};
 
-#[derive(Eq, Copy, Clone, FromPrimitive, ToPrimitive)]
+#[derive(Eq, Copy, Clone, FromPrimitive, ToPrimitive, Serialize, Deserialize)]
 pub enum Card {
     Unknown,
     Card3,
