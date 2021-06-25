@@ -21,6 +21,8 @@ pub fn main() {
     let mut clients: Vec<Endpoint> = vec![];
     let mut client_map: BiHashMap<String, Endpoint> = BiHashMap::new();
 
+    fn get_game(endpoint: Endpoint) -> Game {}
+
     let network_handle = std::thread::spawn(|| {
         // Read incoming network events.
         listener.for_each(move |event| match event.network() {

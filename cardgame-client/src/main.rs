@@ -72,6 +72,10 @@ fn run_console_thread(
         if line == "exit" {
             return;
         }
+        let user = line;
+        let mut player_cards: Vec<Card> = vec![];
+        let mut game_state = GameState::WaitingForPlayers;
+        let mut is_landlord_candidate = false;
         let data = bincode::serialize(&C2SMessage::Login(String::from(line))).unwrap();
         handler.network().send(server_id.clone(), &data);
         let msg = rx.recv().unwrap();
@@ -104,12 +108,64 @@ fn run_console_thread(
                     if let S2CMessage::RoomJoined = msg {
                         println!("成功加入：{}", room);
                         current_room = String::from(room);
+                        println!("正在等待游戏开始...");
+                        let msg = rx.recv();
+                        if let Ok(S2CMessage::GameStarted(cards, landlord)) = msg {
+                            println!("开始游戏！");
+                            print!("您的手牌：");
+                            print_cards(&cards);
+                            player_cards = cards;
+                            game_state = GameState::WaitingForLandlord;
+                            if user == landlord {
+                                println!("您是否要叫地主？");
+                                is_landlord_candidate = true;
+                            } else {
+                                println!("正等待 {} 回应叫地主", landlord);
+                                loop {
+                                    let msg = rx.recv().unwrap();
+                                    if let S2CMessage::LordCards(landlord, cards) = msg {
+                                        println!(
+                                            "{} 成功叫地主，底牌为{}",
+                                            landlord,
+                                            cards_to_string(&cards)
+                                        );
+                                        break;
+                                    } else if let S2CMessage::LandlordMove(landlord) = msg {
+                                        if user == landlord {
+                                            println!("您是否要叫地主？");
+                                            is_landlord_candidate = true;
+                                            break;
+                                        } else {
+                                            println!("正等待 {} 回应叫地主", landlord);
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     } else if let S2CMessage::RoomFull = msg {
                         println!("房间已满");
                     }
                 }
             } else {
                 match line {
+                    "叫地主" => {
+                        if game_state != GameState::WaitingForLandlord {
+                            println!("此时还不能叫地主！");
+                        } else if !is_landlord_candidate {
+                            let data = bincode::serialize(&C2SMessage::LandlordSelected(
+                                String::from(user),
+                            ))
+                            .unwrap();
+                            handler.network().send(server_id.clone(), &data);
+                            let msg = rx.recv().unwrap();
+                            if let S2CMessage::LordCards(landlord, cards) = msg {
+                                println!("成功叫地主，底牌为{}", cards_to_string(&cards));
+                                for c in cards {
+                                    player_cards.push(c);
+                                }
+                            }
+                        }
+                    }
                     "开始游戏" => {
                         if current_room.is_empty() {
                             println!("你还没加入一个房间！");
@@ -119,10 +175,18 @@ fn run_console_thread(
                                     .unwrap();
                             handler.network().send(server_id.clone(), &data);
                             let msg = rx.recv().unwrap();
-                            if let S2CMessage::GameStarted(cards) = msg {
+                            if let S2CMessage::GameStarted(cards, landlord) = msg {
                                 println!("开始游戏！");
                                 print!("您的手牌：");
                                 print_cards(&cards);
+                                player_cards = cards;
+                                game_state = GameState::WaitingForLandlord;
+                                if user == landlord {
+                                    println!("您是否要叫地主？");
+                                    is_landlord_candidate = true;
+                                } else {
+                                    println!("正等待 {} 回应叫地主", landlord);
+                                }
                             } else if let S2CMessage::GameNotStarted(reason) = msg {
                                 println!("游戏未开始，原因：{}", reason);
                             }
@@ -149,11 +213,22 @@ fn run_console_thread(
     })
 }
 
+fn run_readline_thread() -> JoinHandle<()> {
+    std::thread::spawn(move || {})
+}
+
 fn print_cards(cards: &Vec<Card>) {
+    println!("{}", cards_to_string(cards));
+}
+
+fn cards_to_string(cards: &Vec<Card>) -> String {
+    let mut s = String::new();
     for c in cards.iter() {
-        print!("[{}]", c.to_string());
+        s += "[";
+        s += c.to_string();
+        s += "]";
     }
-    println!();
+    s
 }
 
 fn run() {
