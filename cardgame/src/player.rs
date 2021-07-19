@@ -1,29 +1,30 @@
 use crate::card::Card;
 use serde::{Deserialize, Serialize};
+use crate::user::User;
 
-#[derive(Serialize, Deserialize, PartialEq)]
-pub struct PlayerData {
-    pub id: String,
-    pub score: i64,
-}
-
+/// 玩家类型
 #[derive(PartialEq, Serialize, Deserialize)]
 pub enum PlayerType {
+    /// 农民
     Farmer,
+
+    /// 地主
     Landlord,
 }
 
-#[derive(Serialize, Deserialize, PartialEq)]
-pub struct Player {
-    pub data: PlayerData,
+/// 游戏玩家
+/// 生命周期：整个游戏流程
+#[derive(PartialEq)]
+pub struct Player<'game> {
+    pub user: &'game User,
     pub cards: Vec<Card>,
     pub player_type: PlayerType,
 }
 
-impl Player {
-    pub fn new(id: String, score: i64) -> Player {
+impl<'user> Player<'user> {
+    pub fn new(user: &'user User) -> Player<'user> {
         Player {
-            data: PlayerData { id, score },
+            user,
             cards: vec![],
             player_type: PlayerType::Farmer,
         }

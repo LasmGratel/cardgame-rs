@@ -1,15 +1,18 @@
-use crate::player::PlayerData;
-use crate::Card;
+use crate::{Card, LobbyError, RoomError, GameError};
 use serde::{Deserialize, Serialize};
+use crate::user::User;
 
 #[derive(Serialize, Deserialize)]
 pub enum S2CMessage {
-    UpdateData(PlayerData),
+    UpdateData(User),
     Pong,
     LoggedIn,
     RoomList(Vec<String>),
     RoomJoined,
     RoomFull,
+    RoomErr(RoomError),
+    LobbyErr(LobbyError),
+    GameErr(GameError),
     GameStarted(Vec<Card>, String),
     GameNotStarted(String),
     LandlordMove(String),
@@ -18,7 +21,7 @@ pub enum S2CMessage {
 
 #[derive(Serialize, Deserialize)]
 pub enum C2SMessage {
-    SubmitCards(Vec<u8>),
+    SubmitCards(Vec<Card>),
     ChooseLandlord,
     LandlordSelected(String),
     Ping,

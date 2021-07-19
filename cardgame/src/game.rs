@@ -5,6 +5,7 @@ use rand::prelude::SliceRandom;
 use rand::thread_rng;
 use rand::Rng;
 use regex::Regex;
+use serde::{Serialize, Deserialize};
 
 #[derive(PartialEq, Eq)]
 pub enum GameState {
@@ -13,8 +14,8 @@ pub enum GameState {
     Running,
 }
 
-pub struct Game {
-    pub players: Vec<Player>,
+pub struct Game<'user> {
+    pub players: Vec<Player<'user>>,
     pub state: GameState,
     pub index: usize,
     pub landlord_index: usize,
@@ -26,8 +27,8 @@ pub struct Game {
     pub last_index: usize,
 }
 
-impl Game {
-    pub fn new() -> Game {
+impl<'user> Game<'user> {
+    pub fn new() -> Game<'user> {
         Game {
             players: vec![],
             state: GameState::WaitingForPlayers,
@@ -40,7 +41,7 @@ impl Game {
         }
     }
 
-    pub fn add_player(&mut self, player: Player) -> bool {
+    pub fn add_player(&mut self, player: Player<'user>) -> bool {
         if self.players.len() < 3 {
             self.players.push(player);
             true
@@ -69,7 +70,7 @@ impl Game {
 
     pub fn print_cards(&self) {
         for p in self.players.iter() {
-            print!("{}: ", p.data.id);
+            print!("{}: ", p.user.id);
             for c in p.cards.iter() {
                 print!("[{}]", c.to_string());
             }
@@ -78,17 +79,17 @@ impl Game {
     }
 
     pub fn print_player(&self) {
-        println!("轮到 {} 出牌", self.current_player().data.id);
+        println!("轮到 {} 出牌", self.current_player().user.id);
     }
 
     pub fn print_landlord(&self) {
         println!(
             "{} 你要叫地主吗？",
-            self.players[self.landlord_index].data.id
+            self.players[self.landlord_index].user.id
         )
     }
 
-    pub fn start(&mut self) -> Result<(), &str> {
+    pub fn start(&mut self) -> Result<&Player, &str> {
         if self.players.len() != 3 {
             return Err("玩家数不够!");
         }
@@ -112,13 +113,13 @@ impl Game {
         }
         self.print_cards();
 
-        Ok(())
+        Ok(&self.players[self.landlord_index])
     }
 
     pub fn win(&mut self) {
         match self.current_player().player_type {
             PlayerType::Landlord => {
-                println!("{} 赢了！", self.current_player().data.id);
+                println!("{} 赢了！", self.current_player().user.id);
             }
             PlayerType::Farmer => {
                 for p in self
@@ -126,7 +127,7 @@ impl Game {
                     .iter()
                     .filter(|x| x.player_type == PlayerType::Farmer)
                 {
-                    println!("{} 赢了！", self.current_player().data.id);
+                    println!("{} 赢了！", self.current_player().user.id);
                 }
             }
         }
@@ -146,14 +147,14 @@ impl Game {
         }
     }
 
-    pub fn submit_cards(&mut self, cards: Vec<Card>) -> Result<(), &str> {
+    pub fn submit_cards(&mut self, cards: Vec<Card>) -> Result<(), GameError> {
         let rule = match_rule(&cards);
         if rule_matches(&self.last_rule, &cards) {
             let option = to_card_groups(&self.current_player().cards) - to_card_groups(&cards);
             if option.is_none() {
-                return Err("你手里没有这些牌！");
+                return Err(GameError::NoSuchCards);
             }
-            print!("{} 出牌：", self.current_player().data.id);
+            print!("{} 出牌：", self.current_player().user.id);
             for c in cards.iter() {
                 print!("[{}]", c.to_string());
             }
@@ -175,7 +176,7 @@ impl Game {
             self.print_player();
             Ok(())
         } else {
-            Err("你出的牌不符合规则！")
+            Err(GameError::WrongRule)
         }
     }
 
@@ -204,6 +205,11 @@ impl Game {
 
         Ok(())
     }
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum GameError {
+    NotYourTurn, NoSuchCards, WrongRule
 }
 
 pub fn gen_cards() -> Vec<Card> {

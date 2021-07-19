@@ -2,6 +2,7 @@ extern crate num_derive;
 extern crate num_traits;
 extern crate regex;
 extern crate serde;
+extern crate serde_json;
 #[cfg(test)]
 mod tests {}
 
@@ -15,6 +16,7 @@ pub mod lobby;
 pub mod messages;
 pub mod player;
 pub mod rule;
+pub mod user;
 
 pub use card::*;
 pub use game::*;

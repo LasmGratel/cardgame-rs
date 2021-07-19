@@ -142,8 +142,15 @@ fn run_console_thread(
                                 }
                             }
                         }
-                    } else if let S2CMessage::RoomFull = msg {
-                        println!("房间已满");
+                    } else if let S2CMessage::LobbyErr(err) = msg {
+                        match err {
+                            LobbyError::HasJoinedRoom => {
+                                println!("你已经在 {} 房间了！", current_room);
+                            }
+                            LobbyError::RoomFull => {
+                                println!("房间已满！")
+                            }
+                        }
                     }
                 }
             } else {
@@ -230,7 +237,7 @@ fn cards_to_string(cards: &Vec<Card>) -> String {
     }
     s
 }
-
+/*
 fn run() {
     println!("Len: {}", gen_cards().len());
 
@@ -282,7 +289,7 @@ fn run() {
             break;
         }
     }
-}
+}*/
 
 fn main() {
     let transport = Transport::FramedTcp;
@@ -314,3 +321,5 @@ fn main() {
     run_network_thread(server_id.clone(), handler.clone(), listener, tx);
     run_console_thread(server_id.clone(), handler.clone(), rx).join();
 }
+
+pub mod device;
