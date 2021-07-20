@@ -22,13 +22,15 @@ pub fn main() {
         .listen(Transport::FramedTcp, "0.0.0.0:3042")
         .unwrap();
 
-    let mut lobby = Lobby::new();
-    let mut clients: Vec<Endpoint> = vec![];
-    let mut client_map: BiHashMap<String, Endpoint> = BiHashMap::new();
-    let mut user_manager = UserManager::new(String::from("users"));
-    let mut user_states: HashMap<String, UserState> = HashMap::new();
 
     let network_handle = std::thread::spawn(|| {
+
+        let mut lobby = Lobby::new();
+        let mut clients: Vec<Endpoint> = vec![];
+        let mut client_map: BiHashMap<String, Endpoint> = BiHashMap::new();
+        let mut user_manager = UserManager::new(String::from("users"));
+        let mut user_states: HashMap<String, UserState> = HashMap::new();
+
         // Read incoming network events.
         listener.for_each(move |event| match event.network() {
             NetEvent::Connected(endpoint, _) => {
@@ -37,7 +39,14 @@ pub fn main() {
             }
             NetEvent::Message(endpoint, data) => {
                 let get_user = || -> Option<&User> {
-                    client_map.get_by_right(&endpoint).map(|x| user_manager.get_user(x))
+                    client_map.get_by_right(&endpoint).map(|x| &user_manager.get_user_safe(x).unwrap())
+                };
+                let get_room = || -> Option<&mut Room> {
+                    if let Some(UserState::Playing(room_name)) = user_states.get(client_map.get_by_right(&endpoint)?) {
+                        lobby.rooms.get_mut(room_name)
+                    } else {
+                        None
+                    }
                 };
                 let send_to_client = |msg: &S2CMessage| -> () {
                     let to_send = bincode::serialize(msg).unwrap();
@@ -56,6 +65,7 @@ pub fn main() {
                     }
                     C2SMessage::Login(username) => {
                         println!("User {} Logged in", username);
+                        send_to_client(&S2CMessage::LoggedIn);
 
                         client_map.insert(username.clone(), endpoint.clone());
 
@@ -68,6 +78,7 @@ pub fn main() {
                                 match state {
                                     UserState::Idle => {
                                         lobby.login(user);
+
                                     }
                                     UserState::Matchmaking => {
                                         // 断线后取消匹配
@@ -116,11 +127,12 @@ pub fn main() {
                         }
                     }
                     C2SMessage::ChooseLandlord => {
-                        if let Some(room) = lobby.rooms.get_mut(&room_name) {
+
+                        if let Some(room) = get_room() {
                             if room.game.state != GameState::WaitingForLandlord {
                                 send_to_client(&S2CMessage::RoomErr(RoomError::NotStarted));
                             }
-                            if room.game.players[room.game.landlord_index].user != get_user.unwrap() {
+                            if room.game.players[room.game.landlord_index].user != get_user().unwrap() {
                                 send_to_client(&S2CMessage::RoomErr(RoomError::NotLandlordPlayer));
                             }
                             room.game.run();
@@ -132,10 +144,10 @@ pub fn main() {
                         }
                     }
                     C2SMessage::SubmitCards(cards) => {
-                        if let Some(room) = lobby.rooms.get_mut(&room_name) {
+                        if let Some(room) = get_room() {
                             if room.game.state != GameState::Running {
                                 send_to_client(&S2CMessage::RoomErr(RoomError::NotReady));
-                            } else if room.game.current_player() != get_user().unwrap() {
+                            } else if room.game.current_player().user != get_user().unwrap() {
                                 send_to_client(&S2CMessage::GameErr(GameError::NotYourTurn));
                             } else {
                                 room.game.submit_cards(cards);
