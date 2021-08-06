@@ -17,13 +17,21 @@ pub enum S2CMessage {
     GameNotStarted(String),
     LandlordMove(String),
     LordCards(String, Vec<Card>),
+    CardsSubmitted(String, Vec<Card>),
+
+    /// 该谁出牌
+    Move(String),
 }
 
 #[derive(Serialize, Deserialize)]
 pub enum C2SMessage {
+    /// 出牌
     SubmitCards(Vec<Card>),
-    ChooseLandlord,
-    LandlordSelected(String),
+
+    /// 过牌
+    Pass,
+
+    ChooseLandlord(bool),
     Ping,
     Login(String),
     QueryRoomList,

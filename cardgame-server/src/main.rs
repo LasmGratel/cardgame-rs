@@ -108,7 +108,8 @@ pub fn main() {
                                         match room.start_game() {
                                             Ok((landlord_player, players)) => {
                                                 for player in players {
-                                                    send_to_user(&player.user, &S2CMessage::GameStarted(player.cards.clone(), landlord_player.user.id.clone()))
+                                                    send_to_user(&player.user, &S2CMessage::GameStarted(player.cards.clone(), landlord_player.user.id.clone()));
+                                                    user_states.insert(player.user.id.clone(), UserState::Playing(room_name.clone()));
                                                 }
                                             }
                                             Err(err) => {
@@ -142,7 +143,7 @@ pub fn main() {
                             send_to_client(&S2CMessage::RoomErr(RoomError::NotReady));
                         }
                     }
-                    C2SMessage::ChooseLandlord => {
+                    C2SMessage::ChooseLandlord(choose) => {
                         let room = if let Some(UserState::Playing(room_name)) = user_states.get(client_map.get_by_right(&endpoint).unwrap()) {
                             lobby.rooms.get_mut(room_name)
                         } else {
@@ -156,9 +157,44 @@ pub fn main() {
                             if room.game.players[room.game.landlord_index].user != get_user().unwrap() {
                                 send_to_client(&S2CMessage::RoomErr(RoomError::NotLandlordPlayer));
                             }
-                            room.game.run();
-                            for player in room.game.players.iter() {
-                                send_to_user(&player.user, &S2CMessage::LordCards(room.game.current_player().user.id.clone(), room.game.landlord_cards.clone()))
+                            if choose {
+                                room.game.run();
+                                for player in room.game.players.iter() {
+                                    send_to_user(&player.user, &S2CMessage::LordCards(room.game.current_player().user.id.clone(), room.game.landlord_cards.clone()))
+                                }
+                            } else {
+                                room.game.move_landlord_index();
+                                for player in room.game.players.iter() {
+                                    send_to_user(&player.user, &S2CMessage::LandlordMove(room.game.landlord_player().user.id.clone()))
+                                }
+                            }
+                        } else {
+                            send_to_client(&S2CMessage::RoomErr(RoomError::NotReady));
+                        }
+                    }
+                    C2SMessage::Pass => {
+                        let room = if let Some(UserState::Playing(room_name)) = user_states.get(client_map.get_by_right(&endpoint).unwrap()) {
+                            lobby.rooms.get_mut(room_name)
+                        } else {
+                            None
+                        };
+
+                        if let Some(room) = room {
+                            if room.game.state != GameState::Running {
+                                send_to_client(&S2CMessage::RoomErr(RoomError::NotReady));
+                            } else if room.game.current_player().user != get_user().unwrap() {
+                                send_to_client(&S2CMessage::GameErr(GameError::NotYourTurn));
+                            } else {
+                                match room.game.pass() {
+                                    Ok(next_player) => {
+                                        for user in room.users.iter() {
+                                            send_to_user(user, &S2CMessage::Move(next_player.clone()));
+                                        }
+                                    }
+                                    Err(e) => {
+                                        send_to_client(&S2CMessage::GameErr(e));
+                                    }
+                                }
                             }
                         } else {
                             send_to_client(&S2CMessage::RoomErr(RoomError::NotReady));
@@ -177,7 +213,17 @@ pub fn main() {
                             } else if room.game.current_player().user != get_user().unwrap() {
                                 send_to_client(&S2CMessage::GameErr(GameError::NotYourTurn));
                             } else {
-                                room.game.submit_cards(cards);
+                                match room.game.submit_cards(cards.clone()) {
+                                    Ok(next_player) => {
+                                        for user in room.users.iter() {
+                                            send_to_user(user, &S2CMessage::CardsSubmitted(client_map.get_by_right(&endpoint).unwrap().clone(), cards.clone()));
+                                            send_to_user(user, &S2CMessage::Move(next_player.clone()));
+                                        }
+                                    }
+                                    Err(e) => {
+                                        send_to_client(&S2CMessage::GameErr(e));
+                                    }
+                                }
                             }
                         } else {
                             send_to_client(&S2CMessage::RoomErr(RoomError::NotReady));

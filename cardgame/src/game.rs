@@ -83,11 +83,8 @@ impl Game {
         println!("轮到 {} 出牌", self.current_player().user.id);
     }
 
-    pub fn print_landlord(&self) {
-        println!(
-            "{} 你要叫地主吗？",
-            self.players[self.landlord_index].user.id
-        )
+    pub fn landlord_player(&self) -> &Player {
+        &self.players[self.landlord_index]
     }
 
     pub fn start(&mut self) -> Result<(&Player, Iter<Player>), &str> {
@@ -136,19 +133,19 @@ impl Game {
         self.state = GameState::WaitingForPlayers;
     }
 
-    pub fn pass(&mut self) -> Result<(), &str> {
+    pub fn pass(&mut self) -> Result<String, GameError> {
         if self.state != GameState::Running {
-            Ok(())
+            Err(GameError::NotRunning)
         } else if self.index == self.last_index {
-            Err("过你马呢，该你出牌了")
+            Err(GameError::YourTurn)
         } else {
             self.move_index();
             self.print_player();
-            Ok(())
+            Ok(self.current_player().user.id.clone())
         }
     }
 
-    pub fn submit_cards(&mut self, cards: Vec<Card>) -> Result<(), GameError> {
+    pub fn submit_cards(&mut self, cards: Vec<Card>) -> Result<String, GameError> {
         let rule = match_rule(&cards);
         if rule_matches(&self.last_rule, &cards) {
             let option = to_card_groups(&self.current_player().cards) - to_card_groups(&cards);
@@ -164,7 +161,7 @@ impl Game {
             // 赢得胜利
             if self.current_player().cards.is_empty() {
                 self.win();
-                return Ok(());
+                return Err(GameError::Win(self.current_player().user.id.clone()));
             }
 
             self.players[self.index].cards = option.unwrap().to_cards();
@@ -175,7 +172,7 @@ impl Game {
 
             self.print_cards();
             self.print_player();
-            Ok(())
+            Ok(self.current_player().user.id.clone())
         } else {
             Err(GameError::WrongRule)
         }
@@ -210,7 +207,13 @@ impl Game {
 
 #[derive(Serialize, Deserialize)]
 pub enum GameError {
-    NotYourTurn, NoSuchCards, WrongRule
+    NotRunning, NotYourTurn, NoSuchCards, WrongRule,
+
+    /// 这把赢了
+    Win(String),
+
+    /// 过你马呢
+    YourTurn
 }
 
 pub fn gen_cards() -> Vec<Card> {

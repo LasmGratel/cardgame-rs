@@ -26,7 +26,10 @@ enum ClientState {
     /// 在房间中等待玩家
     WaitingForPlayers(String),
 
-    WaitingForLandlord
+    WaitingForLandlord,
+
+    /// 游戏中
+    Gaming,
 }
 
 fn run_network_thread(
@@ -69,16 +72,33 @@ fn run_network_thread(
 
                             *landlord_name.lock().unwrap() = landlord;
                         }
+                        S2CMessage::CardsSubmitted(player, cards) => {
+                            println!("{} 出牌：{}", player, cards_to_string(&cards));
+                            if user_name.lock().unwrap().eq(&player) {
+                                let mut cards_mut = cards_mutex.lock().unwrap();
+                                for card in cards.iter() {
+                                    let pos = cards_mut.iter().position(|x| x == card).unwrap();
+                                    cards_mut.remove(pos);
+                                }
+                                print!("你的手牌：");
+                                print_cards(&cards_mut);
+                            }
+                        }
+                        S2CMessage::Move(player) => {
+                            println!("{} 请出牌", player);
+                        }
                         S2CMessage::LordCards(landlord, cards) => {
                             println!("{} 叫地主，地主牌为 {}", landlord, cards_to_string(&cards));
-                            if *landlord_name.lock().unwrap() == landlord {
+                            if *user_name.lock().unwrap() == landlord {
                                 let mut player_cards = cards_mutex.lock().unwrap();
                                 for card in cards.iter() {
                                     player_cards.push(card.clone());
+                                    player_cards.sort();
                                 }
                                 print!("你的手牌：");
                                 print_cards(&player_cards);
                             }
+                            *client_state.lock().unwrap() = ClientState::Gaming;
                         }
                         S2CMessage::RoomErr(err) => {
                             match err {
@@ -86,10 +106,10 @@ fn run_network_thread(
                                     println!("房间未准备好！");
                                 }
                                 RoomError::NotStarted => {
-                                    println!("游戏还未开始！")
+                                    println!("游戏还未开始！");
                                 }
                                 RoomError::NotLandlordPlayer => {
-                                    println!("不是你叫地主！")
+                                    println!("不是你叫地主！");
                                 }
                             }
                         }
@@ -99,11 +119,16 @@ fn run_network_thread(
                                     println!("你还不能出牌！");
                                 }
                                 GameError::NoSuchCards => {
-                                    println!("你没有这些牌")
+                                    println!("你没有这些牌");
                                 }
                                 GameError::WrongRule => {
-                                    println!("你出的牌不满足当前规则")
+                                    println!("你出的牌不满足当前规则");
                                 }
+                                GameError::Win(player) => {
+                                    println!("{} 赢了。", player);
+                                    *client_state.lock().unwrap() = ClientState::Idle;
+                                }
+                                _ => {}
                             }
                         }
                         S2CMessage::GameStarted(cards, landlord) => {
@@ -197,18 +222,27 @@ fn run_console_thread(
             }
 
             if line.starts_with("加入 ") {
-                let state = client_state.clone();
-                let handler = handler.clone();
-                let task = task::spawn(async move {
-                    let room = line.trim_start_matches("加入 ");
-                    if *state.lock().unwrap() != ClientState::Idle {
-                        println!("此时无法加入房间。");
-                        return;
+                let room = line.trim_start_matches("加入 ");
+                if *client_state.lock().unwrap() != ClientState::Idle {
+                    println!("此时无法加入房间。");
+                    return;
+                } else {
+                    let data = bincode::serialize(&C2SMessage::JoinRoom(String::from(room))).unwrap();
+                    handler.network().send(server_id.clone(), &data);
+                }
+            } else if line.starts_with("出牌 ") {
+                if *client_state.lock().unwrap() == ClientState::Gaming {
+                    let str = line.trim_start_matches("出牌 ");
+                    let cards = parse_input(str);
+                    if cards.is_empty() {
+                        println!("你没有出任何牌！")
                     } else {
-                        let data = bincode::serialize(&C2SMessage::JoinRoom(String::from(room))).unwrap();
+                        let data = bincode::serialize(&C2SMessage::SubmitCards(cards)).unwrap();
                         handler.network().send(server_id.clone(), &data);
                     }
-                });
+                } else {
+                    println!("你现在还不能出牌！");
+                }
             } else {
                 match line.as_str() {
                     "叫地主" => {
@@ -217,7 +251,16 @@ fn run_console_thread(
                         } else if landlord_name.lock().unwrap().ne(&user) {
                             println!("不是你叫地主！")
                         } else if !is_landlord_candidate {
-                            send_to_server(&C2SMessage::ChooseLandlord);
+                            send_to_server(&C2SMessage::ChooseLandlord(true));
+                        }
+                    }
+                    "不叫" => {
+                        if *client_state.lock().unwrap() != ClientState::WaitingForLandlord {
+                            println!("此时还不能叫地主！");
+                        } else if landlord_name.lock().unwrap().ne(&user) {
+                            println!("不是你叫地主！")
+                        } else if !is_landlord_candidate {
+                            send_to_server(&C2SMessage::ChooseLandlord(false));
                         }
                     }
                     "开始游戏" => {
@@ -228,6 +271,14 @@ fn run_console_thread(
                                 bincode::serialize(&C2SMessage::StartGame(current_room.clone()))
                                     .unwrap();
                             handler.network().send(server_id.clone(), &data);
+                        }
+                    }
+                    "pass" => {
+                        if *client_state.lock().unwrap() == ClientState::Gaming {
+                            let data = bincode::serialize(&C2SMessage::Pass).unwrap();
+                            handler.network().send(server_id.clone(), &data);
+                        } else {
+                            println!("你现在还不能过牌！");
                         }
                     }
                     "游戏列表" => {
