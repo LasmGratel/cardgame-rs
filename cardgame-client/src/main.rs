@@ -161,8 +161,7 @@ fn run_console_thread(
                         } else if !is_landlord_candidate {
                             let data = bincode::serialize(&C2SMessage::LandlordSelected(
                                 String::from(user),
-                            ))
-                            .unwrap();
+                            )).unwrap();
                             handler.network().send(server_id.clone(), &data);
                             let msg = rx.recv().unwrap();
                             if let S2CMessage::LordCards(landlord, cards) = msg {

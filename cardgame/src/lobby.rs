@@ -2,11 +2,12 @@ use std::collections::HashMap;
 use crate::user::User;
 use crate::{Game, Player};
 use serde::{Serialize, Deserialize};
+use std::slice::Iter;
 
-pub struct Room<'user> {
+pub struct Room {
     pub name: String,
-    pub users: Vec<&'user User>,
-    pub game: Game<'user>,
+    pub users: Vec<User>,
+    pub game: Game,
     pub state: RoomState
 }
 
@@ -15,8 +16,8 @@ pub enum RoomState {
     Waiting, Ready
 }
 
-impl<'user> Room<'user> {
-    pub fn new(name: String) -> Room<'user> {
+impl Room {
+    pub fn new(name: String) -> Room {
         Room {
             name,
             users: vec![],
@@ -25,14 +26,14 @@ impl<'user> Room<'user> {
         }
     }
 
-    pub fn push(&mut self, user: &'user User) {
-        self.users.push(user);
+    pub fn push(&mut self, user: User) {
+        self.users.push(user.clone());
         self.game.add_player(Player::new(user));
     }
 
     /// 开始游戏
     /// 返回第一个叫地主的玩家或房间错误
-    pub fn start_game(&mut self) -> Result<&Player, RoomError> {
+    pub fn start_game(&mut self) -> Result<(&Player, Iter<Player>), RoomError> {
         if self.state != RoomState::Ready {
             Err(RoomError::NotReady)
         } else {
@@ -55,22 +56,24 @@ pub enum RoomError {
 
 /// 游戏大厅，用于加入房间和匹配玩家。
 /// 生命周期：大约是服务器的生命周期
-pub struct Lobby<'user> {
-    pub users: Vec<&'user User>,
-    pub waiting_list: Vec<&'user User>,
-    pub rooms: HashMap<String, Room<'user>>,
+pub struct Lobby {
+    pub users: Vec<User>,
+    pub waiting_list: Vec<User>,
+    pub rooms: HashMap<String, Room>,
+    pub games: HashMap<String, Game>,
 }
 
-impl<'user> Lobby<'user> {
-    pub fn new() -> Lobby<'user> {
+impl Lobby {
+    pub fn new() -> Lobby {
         Lobby {
             users: vec![],
             waiting_list: vec![],
             rooms: HashMap::new(),
+            games: HashMap::new(),
         }
     }
 
-    pub fn join_room(&mut self, room_name: &String, user: &'user User) -> Result<&Room, LobbyError> {
+    pub fn join_room(&mut self, room_name: &String, user: User) -> Result<&Room, LobbyError> {
         if !self.rooms.contains_key(room_name) {
             self.rooms.insert(room_name.clone(), Room::new(room_name.clone()));
             println!("创建房间: {}", room_name);

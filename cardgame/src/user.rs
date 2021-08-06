@@ -160,6 +160,6 @@ impl UserManager {
     /// 写入文件
     fn write_user(&self, user: &User) {
         let path = Path::new(&self.path).join(&user.id);
-        fs::write(path, serde_json::to_string(user).unwrap());
+        fs::write(path, serde_json::to_string(user).unwrap()).expect("Unable to write user");
     }
 }

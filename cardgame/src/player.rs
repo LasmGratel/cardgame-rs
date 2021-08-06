@@ -15,14 +15,14 @@ pub enum PlayerType {
 /// 游戏玩家
 /// 生命周期：整个游戏流程
 #[derive(PartialEq)]
-pub struct Player<'game> {
-    pub user: &'game User,
+pub struct Player {
+    pub user: User,
     pub cards: Vec<Card>,
     pub player_type: PlayerType,
 }
 
-impl<'user> Player<'user> {
-    pub fn new(user: &'user User) -> Player<'user> {
+impl Player {
+    pub fn new(user: User) -> Player {
         Player {
             user,
             cards: vec![],

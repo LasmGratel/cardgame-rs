@@ -6,6 +6,7 @@ use rand::thread_rng;
 use rand::Rng;
 use regex::Regex;
 use serde::{Serialize, Deserialize};
+use std::slice::Iter;
 
 #[derive(PartialEq, Eq)]
 pub enum GameState {
@@ -14,8 +15,8 @@ pub enum GameState {
     Running,
 }
 
-pub struct Game<'user> {
-    pub players: Vec<Player<'user>>,
+pub struct Game {
+    pub players: Vec<Player>,
     pub state: GameState,
     pub index: usize,
     pub landlord_index: usize,
@@ -27,8 +28,8 @@ pub struct Game<'user> {
     pub last_index: usize,
 }
 
-impl<'user> Game<'user> {
-    pub fn new() -> Game<'user> {
+impl Game {
+    pub fn new() -> Game {
         Game {
             players: vec![],
             state: GameState::WaitingForPlayers,
@@ -41,7 +42,7 @@ impl<'user> Game<'user> {
         }
     }
 
-    pub fn add_player(&mut self, player: Player<'user>) -> bool {
+    pub fn add_player(&mut self, player: Player) -> bool {
         if self.players.len() < 3 {
             self.players.push(player);
             true
@@ -89,7 +90,7 @@ impl<'user> Game<'user> {
         )
     }
 
-    pub fn start(&mut self) -> Result<&Player, &str> {
+    pub fn start(&mut self) -> Result<(&Player, Iter<Player>), &str> {
         if self.players.len() != 3 {
             return Err("玩家数不够!");
         }
@@ -113,7 +114,7 @@ impl<'user> Game<'user> {
         }
         self.print_cards();
 
-        Ok(&self.players[self.landlord_index])
+        Ok((&self.players[self.landlord_index], self.players.iter()))
     }
 
     pub fn win(&mut self) {

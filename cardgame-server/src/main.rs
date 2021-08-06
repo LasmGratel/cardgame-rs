@@ -16,20 +16,24 @@ pub fn main() {
     // The 'listener', used to read events from the network or signals.
     let (handler, listener) = node::split::<()>();
 
-    // Listen for TCP, UDP and WebSocket messages at the same time.
-    handler
-        .network()
-        .listen(Transport::FramedTcp, "0.0.0.0:3042")
-        .unwrap();
-
-
     let network_handle = std::thread::spawn(|| {
+        let addr = "0.0.0.0:3042";
+
+        // Listen for TCP, UDP and WebSocket messages at the same time.
+        handler
+            .network()
+            .listen(Transport::FramedTcp, addr)
+            .expect("Unable to listen on the address!");
+
+        println!("Server listening on {}", addr);
 
         let mut lobby = Lobby::new();
         let mut clients: Vec<Endpoint> = vec![];
         let mut client_map: BiHashMap<String, Endpoint> = BiHashMap::new();
         let mut user_manager = UserManager::new(String::from("users"));
         let mut user_states: HashMap<String, UserState> = HashMap::new();
+
+        println!("Server initialized");
 
         // Read incoming network events.
         listener.for_each(move |event| match event.network() {
@@ -38,15 +42,8 @@ pub fn main() {
                 clients.push(endpoint);
             }
             NetEvent::Message(endpoint, data) => {
-                let get_user = || -> Option<&User> {
-                    client_map.get_by_right(&endpoint).map(|x| &user_manager.get_user_safe(x).unwrap())
-                };
-                let get_room = || -> Option<&mut Room> {
-                    if let Some(UserState::Playing(room_name)) = user_states.get(client_map.get_by_right(&endpoint)?) {
-                        lobby.rooms.get_mut(room_name)
-                    } else {
-                        None
-                    }
+                let get_user = || -> Option<User> {
+                    client_map.get_by_right(&endpoint).map(|x| user_manager.get_user_safe(x).unwrap())
                 };
                 let send_to_client = |msg: &S2CMessage| -> () {
                     let to_send = bincode::serialize(msg).unwrap();
@@ -69,7 +66,7 @@ pub fn main() {
 
                         client_map.insert(username.clone(), endpoint.clone());
 
-                        let user = get_user().unwrap();
+                        let user = client_map.get_by_right(&endpoint).map(|x| user_manager.get_user_safe(x).unwrap()).unwrap();
                         match user_states.get(&username) {
                             None => {
                                 user_states.insert(username, UserState::Idle);
@@ -94,7 +91,7 @@ pub fn main() {
                     // 加入房间
                     C2SMessage::JoinRoom(room_name) => {
                         let user = get_user().unwrap();
-                        let result = lobby.join_room(&room_name, user);
+                        let result = lobby.join_room(&room_name, user.clone());
                         match result {
                             Ok(room) => {
                                 send_to_client(&S2CMessage::RoomJoined);
@@ -104,6 +101,24 @@ pub fn main() {
                                     room_name,
                                     room.users.len()
                                 );
+
+                                if room.users.len() == 3 {
+                                    // 开始游戏
+                                    if let Some(room) = lobby.rooms.get_mut(&room_name) {
+                                        match room.start_game() {
+                                            Ok((landlord_player, players)) => {
+                                                for player in players {
+                                                    send_to_user(&player.user, &S2CMessage::GameStarted(player.cards.clone(), landlord_player.user.id.clone()))
+                                                }
+                                            }
+                                            Err(err) => {
+                                                send_to_client(&S2CMessage::RoomErr(err));
+                                            }
+                                        }
+                                    } else {
+                                        send_to_client(&S2CMessage::RoomErr(RoomError::NotReady));
+                                    }
+                                }
                             }
                             Err(err) => {
                                 send_to_client(&S2CMessage::LobbyErr(err));
@@ -113,9 +128,9 @@ pub fn main() {
                     C2SMessage::StartGame(room_name) => {
                         if let Some(room) = lobby.rooms.get_mut(&room_name) {
                             match room.start_game() {
-                                Ok(landlord_player) => {
-                                    for player in room.game.players.iter() {
-                                        send_to_user(player.user, &S2CMessage::GameStarted(player.cards.clone(), landlord_player.user.id.clone()))
+                                Ok((landlord_player, players)) => {
+                                    for player in players {
+                                        send_to_user(&player.user, &S2CMessage::GameStarted(player.cards.clone(), landlord_player.user.id.clone()))
                                     }
                                 }
                                 Err(err) => {
@@ -127,8 +142,13 @@ pub fn main() {
                         }
                     }
                     C2SMessage::ChooseLandlord => {
+                        let room = if let Some(UserState::Playing(room_name)) = user_states.get(client_map.get_by_right(&endpoint).unwrap()) {
+                            lobby.rooms.get_mut(room_name)
+                        } else {
+                            None
+                        };
 
-                        if let Some(room) = get_room() {
+                        if let Some(room) = room {
                             if room.game.state != GameState::WaitingForLandlord {
                                 send_to_client(&S2CMessage::RoomErr(RoomError::NotStarted));
                             }
@@ -137,14 +157,20 @@ pub fn main() {
                             }
                             room.game.run();
                             for player in room.game.players.iter() {
-                                send_to_user(player.user, &S2CMessage::LordCards(room.game.current_player().user.id.clone(), room.game.landlord_cards.clone()))
+                                send_to_user(&player.user, &S2CMessage::LordCards(room.game.current_player().user.id.clone(), room.game.landlord_cards.clone()))
                             }
                         } else {
                             send_to_client(&S2CMessage::RoomErr(RoomError::NotReady));
                         }
                     }
                     C2SMessage::SubmitCards(cards) => {
-                        if let Some(room) = get_room() {
+                        let room = if let Some(UserState::Playing(room_name)) = user_states.get(client_map.get_by_right(&endpoint).unwrap()) {
+                            lobby.rooms.get_mut(room_name)
+                        } else {
+                            None
+                        };
+
+                        if let Some(room) = room {
                             if room.game.state != GameState::Running {
                                 send_to_client(&S2CMessage::RoomErr(RoomError::NotReady));
                             } else if room.game.current_player().user != get_user().unwrap() {
