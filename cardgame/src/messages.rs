@@ -8,7 +8,7 @@ pub enum S2CMessage {
     Pong,
     LoggedIn,
     RoomList(Vec<String>),
-    RoomJoined,
+    RoomJoined(String),
     RoomFull,
     RoomErr(RoomError),
     LobbyErr(LobbyError),

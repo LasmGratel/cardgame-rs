@@ -94,7 +94,7 @@ pub fn main() {
                         let result = lobby.join_room(&room_name, user.clone());
                         match result {
                             Ok(room) => {
-                                send_to_client(&S2CMessage::RoomJoined);
+                                send_to_client(&S2CMessage::RoomJoined(room_name.clone()));
                                 println!(
                                     "{} 加入 {} 房间，共有 {} 人",
                                     user.id,
@@ -130,7 +130,8 @@ pub fn main() {
                             match room.start_game() {
                                 Ok((landlord_player, players)) => {
                                     for player in players {
-                                        send_to_user(&player.user, &S2CMessage::GameStarted(player.cards.clone(), landlord_player.user.id.clone()))
+                                        send_to_user(&player.user, &S2CMessage::GameStarted(player.cards.clone(), landlord_player.user.id.clone()));
+                                        user_states.insert(player.user.id.clone(), UserState::Playing(room_name.clone()));
                                     }
                                 }
                                 Err(err) => {
