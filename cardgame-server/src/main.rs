@@ -2,8 +2,6 @@ use bimap::BiHashMap;
 use cardgame::*;
 use message_io::network::*;
 use message_io::node;
-use message_io::node::*;
-use std::time::Duration;
 use cardgame::user::{UserManager, UserState, User};
 use std::collections::HashMap;
 use crate::server_mod::ServerLobby;
@@ -43,7 +41,7 @@ pub fn main() {
             }
             NetEvent::Message(endpoint, data) => {
                 let get_user = || -> Option<User> {
-                    client_map.get_by_right(&endpoint).map(|x| user_manager.get_user_safe(x).unwrap())
+                    client_map.get_by_right(&endpoint).map(|x| user_manager.get_user(x).unwrap())
                 };
                 let send_to_client = |msg: &S2CMessage| -> () {
                     let to_send = bincode::serialize(msg).unwrap();
@@ -66,7 +64,7 @@ pub fn main() {
 
                         client_map.insert(username.clone(), endpoint.clone());
 
-                        let user = client_map.get_by_right(&endpoint).map(|x| user_manager.get_user_safe(x).unwrap()).unwrap();
+                        let user = client_map.get_by_right(&endpoint).map(|x| user_manager.get_user(x).unwrap()).unwrap();
                         match user_states.get(&username) {
                             None => {
                                 user_states.insert(username, UserState::Idle);
@@ -83,6 +81,7 @@ pub fn main() {
                                         lobby.login(user);
                                     }
                                     UserState::Playing(room) => {
+                                        // TODO 断线重连
                                     }
                                 }
                             }
@@ -158,7 +157,7 @@ pub fn main() {
                                 send_to_client(&S2CMessage::RoomErr(RoomError::NotLandlordPlayer));
                             }
                             if choose {
-                                room.game.run();
+                                room.game.run().expect("Game cannot run");
                                 for player in room.game.players.iter() {
                                     send_to_user(&player.user, &S2CMessage::LordCards(room.game.current_player().user.id.clone(), room.game.landlord_cards.clone()))
                                 }
@@ -240,8 +239,8 @@ pub fn main() {
             }
             NetEvent::Disconnected(endpoint) => {
                 println!("{} Disconnected", endpoint);
-                if let Some(user) = client_map.get_by_right(&endpoint).map(|x| user_manager.get_user(x)) {
-                    lobby.disconnect(user);
+                if let Some(user) = client_map.get_by_right(&endpoint).map(|x| user_manager.get_user(x).unwrap()) {
+                    lobby.disconnect(&user);
                     user_states.remove(&user.id);
                 }
                 let client = clients
@@ -254,13 +253,9 @@ pub fn main() {
         });
     });
 
-    network_handle.join();
+    network_handle.join().unwrap();
 }
-
-fn login(manager: UserManager, user_id: String) {
-
-}
-
+/*
 fn get_line(prompt: &str) -> String {
     println!("{}", prompt);
     let mut input = String::new();
@@ -269,3 +264,4 @@ fn get_line(prompt: &str) -> String {
         .expect("Not a valid input");
     input
 }
+*/

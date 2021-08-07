@@ -67,7 +67,7 @@ pub struct RuleAirplaneWithTwoWings {
 pub struct RuleNone;
 
 impl Rule for RuleNone {
-    fn matches(&self, cards: &Vec<Card>) -> bool {
+    fn matches(&self, _cards: &Vec<Card>) -> bool {
         false
     }
     fn to_string(&self) -> &str {
@@ -258,7 +258,7 @@ impl RuleRocket {
     }
 }
 impl Rule for RuleRocket {
-    fn matches(&self, cards: &Vec<Card>) -> bool {
+    fn matches(&self, _cards: &Vec<Card>) -> bool {
         false // TODO 双副牌
     }
     fn to_string(&self) -> &str {

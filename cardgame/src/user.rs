@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::fs;
-use std::env::join_paths;
 use std::path::Path;
 use serde::{Serialize, Deserialize};
 
@@ -60,7 +59,7 @@ impl UserManager {
     pub fn new(path: String) -> UserManager {
         let p = Path::new(&path);
         if !p.is_dir() {
-            fs::create_dir(p);
+            fs::create_dir(p).expect("Unable to create user directory");
         }
 
         UserManager {
@@ -69,7 +68,7 @@ impl UserManager {
         }
     }
 
-    pub fn get_user_safe(&self, id: &String) -> Option<User> {
+    pub fn get_user(&self, id: &String) -> Option<User> {
         if self.cache.contains_key(id) {
             self.cache.get(id).map(|x| x.clone())
         } else {
@@ -82,19 +81,9 @@ impl UserManager {
         }
     }
 
-    pub fn get_user(&mut self, id: &String) -> &User {
-        if self.cache.contains_key(id) {
-            self.cache.get(id).unwrap()
-        } else {
-            let user = self.read_user(id);
-            let user = if let Ok(x) = user { // 存在这个文件
-                x
-            } else {
-                User::new(id.clone())
-            };
-            self.cache.insert(id.clone(), user);
-            self.cache.get(id).unwrap()
-        }
+    pub fn insert_user(&mut self, id: String, user: User) {
+        self.cache.insert(id, user);
+        self.write();
     }
 
     pub fn get_user_mut(&mut self, id: &String) -> &mut User {
@@ -110,9 +99,12 @@ impl UserManager {
     pub fn write(&self) {
         self.create_dir_if_not_exists();
 
+        let mut counter = 0;
         for user in self.cache.values().into_iter() {
             self.write_user(user);
+            counter += 1;
         }
+        println!("Saved {} users", counter);
     }
 
     pub fn read(&mut self) -> Result<(), std::io::Error> {
@@ -134,7 +126,7 @@ impl UserManager {
     fn create_dir_if_not_exists(&self) {
         let p = Path::new(&self.path);
         if !p.is_dir() {
-            fs::create_dir(p);
+            fs::create_dir(p).expect("Unable to create user directory");
         }
     }
 
