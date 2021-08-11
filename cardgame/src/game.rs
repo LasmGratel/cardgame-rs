@@ -177,7 +177,9 @@ impl Game {
 
     pub fn submit_cards(&mut self, cards: Vec<Card>) -> Result<String, GameError> {
         let rule = match_rule(&cards);
-        if rule_matches(&self.last_rule, &cards) || self.index == self.last_index {
+        if rule.is_none() {
+            Err(GameError::NoRule)
+        } else if rule_matches(&self.last_rule, &cards) || self.index == self.last_index {
             let option = to_card_groups(&self.current_player().cards) - to_card_groups(&cards);
             if option.is_none() {
                 return Err(GameError::NoSuchCards);
@@ -246,7 +248,7 @@ impl Game {
 
 #[derive(Serialize, Deserialize)]
 pub enum GameError {
-    NotRunning, NotYourTurn, NoSuchCards, WrongRule,
+    NotRunning, NotYourTurn, NoSuchCards, WrongRule, NoRule,
 
     /// 这把赢了
     /// 参数：最后出掉牌的玩家，玩家类型，获得的积分
