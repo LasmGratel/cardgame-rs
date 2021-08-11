@@ -16,16 +16,32 @@ pub enum GameState {
 }
 
 pub struct Game {
+    /// 玩家
     pub players: Vec<Player>,
+
+    /// 游戏状态
     pub state: GameState,
+
+    /// 当前出牌玩家
     pub index: usize,
+
+    /// 地主玩家
     pub landlord_index: usize,
-    pub last_cards: Vec<Card>,
-    pub landlord_cards: Vec<Card>,
-    pub last_rule: Box<dyn Rule>,
 
     /// 最后出牌的玩家
     pub last_index: usize,
+
+    /// 最后出的牌
+    pub last_cards: Vec<Card>,
+
+    /// 最后出牌所匹配的规则
+    pub last_rule: Box<dyn Rule>,
+
+    /// 地主牌
+    pub landlord_cards: Vec<Card>,
+
+    /// 积分倍率
+    pub score_multiplier: u32,
 }
 
 impl Game {
@@ -39,9 +55,11 @@ impl Game {
             last_cards: vec![],
             landlord_cards: vec![],
             last_rule: Box::new(RuleNone),
+            score_multiplier: 1,
         }
     }
 
+    /// “上桌”
     pub fn add_player(&mut self, player: Player) -> bool {
         if self.players.len() < 3 {
             self.players.push(player);
@@ -51,6 +69,7 @@ impl Game {
         }
     }
 
+    /// 获取当前玩家的引用
     pub fn current_player(&self) -> &Player {
         &self.players[self.index]
     }
@@ -71,7 +90,7 @@ impl Game {
 
     pub fn print_cards(&self) {
         for p in self.players.iter() {
-            print!("{}: ", p.user.id);
+            print!("{}: ", p.user);
             for c in p.cards.iter() {
                 print!("[{}]", c.to_string());
             }
@@ -80,7 +99,7 @@ impl Game {
     }
 
     pub fn print_player(&self) {
-        println!("轮到 {} 出牌", self.current_player().user.id);
+        println!("轮到 {} 出牌", self.current_player().user);
     }
 
     pub fn landlord_player(&self) -> &Player {
@@ -117,7 +136,7 @@ impl Game {
     pub fn win(&mut self) {
         match self.current_player().player_type {
             PlayerType::Landlord => {
-                println!("{} 赢了！", self.current_player().user.id);
+                println!("{} 赢了！", self.current_player().user);
             }
             PlayerType::Farmer => {
                 for p in self
@@ -125,7 +144,8 @@ impl Game {
                     .iter()
                     .filter(|x| x.player_type == PlayerType::Farmer)
                 {
-                    println!("{} 赢了！", self.current_player().user.id);
+                    println!("{} 赢了！", self.current_player().user);
+                    // TODO 结算
                 }
             }
         }
@@ -141,7 +161,7 @@ impl Game {
         } else {
             self.move_index();
             self.print_player();
-            Ok(self.current_player().user.id.clone())
+            Ok(self.current_player().user.clone())
         }
     }
 
@@ -152,7 +172,7 @@ impl Game {
             if option.is_none() {
                 return Err(GameError::NoSuchCards);
             }
-            print!("{} 出牌：", self.current_player().user.id);
+            print!("{} 出牌：", self.current_player().user);
             for c in cards.iter() {
                 print!("[{}]", c.to_string());
             }
@@ -161,18 +181,20 @@ impl Game {
             // 赢得胜利
             if self.current_player().cards.is_empty() {
                 self.win();
-                return Err(GameError::Win(self.current_player().user.id.clone()));
+                return Err(GameError::Win(self.current_player().user.clone()));
             }
 
             self.players[self.index].cards = option.unwrap().to_cards();
+
             self.last_rule = rule;
             self.last_cards = cards;
             self.last_index = self.index;
+
             self.move_index();
 
             self.print_cards();
             self.print_player();
-            Ok(self.current_player().user.id.clone())
+            Ok(self.current_player().user.clone())
         } else {
             Err(GameError::WrongRule)
         }

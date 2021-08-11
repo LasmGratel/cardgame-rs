@@ -6,13 +6,9 @@ use cardgame::*;
 use message_io::network::*;
 use message_io::node;
 use message_io::node::*;
-use std::io;
 use std::sync::mpsc::*;
 use std::thread::JoinHandle;
-use std::time::Duration;
-use async_std::task;
 use std::sync::{Mutex, Arc};
-use std::rc::Rc;
 
 /// 客户端状态
 #[derive(Eq, PartialEq, Clone)]
@@ -191,7 +187,6 @@ fn run_console_thread(
             handler.network().send(server_id.clone(), &data);
         };
 
-        let mut current_room = String::new();
         let line = read_line("请输入用户名：");
         let line = line.trim();
         if line == "exit" {
@@ -199,8 +194,6 @@ fn run_console_thread(
         }
         let user = line.to_string();
         *user_name.lock().unwrap() = String::from(user.clone());
-        let mut player_cards: Vec<Card> = vec![];
-        let mut is_landlord_candidate = false;
         let data = bincode::serialize(&C2SMessage::Login(user.clone())).unwrap();
         handler.network().send(server_id.clone(), &data);
         let msg = rx.recv().unwrap();
@@ -250,7 +243,7 @@ fn run_console_thread(
                             println!("此时还不能叫地主！");
                         } else if landlord_name.lock().unwrap().ne(&user) {
                             println!("不是你叫地主！")
-                        } else if !is_landlord_candidate {
+                        } else {
                             send_to_server(&C2SMessage::ChooseLandlord(true));
                         }
                     }
@@ -259,18 +252,24 @@ fn run_console_thread(
                             println!("此时还不能叫地主！");
                         } else if landlord_name.lock().unwrap().ne(&user) {
                             println!("不是你叫地主！")
-                        } else if !is_landlord_candidate {
+                        } else {
                             send_to_server(&C2SMessage::ChooseLandlord(false));
                         }
                     }
                     "开始游戏" => {
-                        if current_room.is_empty() {
-                            println!("你还没加入一个房间！");
-                        } else {
-                            let data =
-                                bincode::serialize(&C2SMessage::StartGame(current_room.clone()))
-                                    .unwrap();
-                            handler.network().send(server_id.clone(), &data);
+                        match client_state.lock().unwrap().clone() {
+                            ClientState::Idle => {
+                                println!("你还没加入一个房间！");
+                            }
+                            ClientState::WaitingForPlayers(room_name) => {
+                                let data =
+                                    bincode::serialize(&C2SMessage::StartGame(room_name.clone()))
+                                        .unwrap();
+                                handler.network().send(server_id.clone(), &data);
+                            }
+                            _ => {
+                                println!("游戏已开始或无法开始！")
+                            }
                         }
                     }
                     "pass" => {
@@ -300,10 +299,6 @@ fn run_console_thread(
             }
         }
     })
-}
-
-fn run_readline_thread() -> JoinHandle<()> {
-    std::thread::spawn(move || {})
 }
 
 fn print_cards(cards: &Vec<Card>) {
@@ -408,7 +403,7 @@ fn main() {
     let (tx, rx) = channel();
 
     run_network_thread(server_id.clone(), handler.clone(), listener, tx, mutexs.clone());
-    run_console_thread(server_id.clone(), handler.clone(), rx, mutexs.clone()).join();
+    run_console_thread(server_id.clone(), handler.clone(), rx, mutexs.clone()).join().unwrap();
 }
 
 pub mod device;

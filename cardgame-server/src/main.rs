@@ -2,11 +2,15 @@ use bimap::BiHashMap;
 use cardgame::*;
 use message_io::network::*;
 use message_io::node;
-use cardgame::user::{UserManager, UserState, User};
+use cardgame::user::{UserManager, UserState, User, UserId};
 use std::collections::HashMap;
-use crate::server_mod::ServerLobby;
+use crate::server_lobby::ServerLobby;
 
-pub mod server_mod;
+pub mod server_lobby;
+
+pub fn get_room_by_endpoint(endpoint: &Endpoint) {
+
+}
 
 pub fn main() {
     // Create a node, the main message-io entity. It is divided in 2 parts:
@@ -25,7 +29,7 @@ pub fn main() {
 
         println!("Server listening on {}", addr);
 
-        let mut lobby = Lobby::new();
+        let mut lobby = ServerLobby::new();
         let mut clients: Vec<Endpoint> = vec![];
         let mut client_map: BiHashMap<String, Endpoint> = BiHashMap::new();
         let mut user_manager = UserManager::new(String::from("users"));
@@ -43,13 +47,16 @@ pub fn main() {
                 let get_user = || -> Option<User> {
                     client_map.get_by_right(&endpoint).map(|x| user_manager.get_user(x).unwrap())
                 };
+                let get_user_id = || -> Option<&UserId> {
+                    client_map.get_by_right(&endpoint)
+                };
                 let send_to_client = |msg: &S2CMessage| -> () {
                     let to_send = bincode::serialize(msg).unwrap();
                     handler.network().send(endpoint, &to_send);
                 };
-                let send_to_user = |user: &User, msg: &S2CMessage| -> () {
+                let send_to_user = |user: &UserId, msg: &S2CMessage| -> () {
                     let to_send = bincode::serialize(msg).unwrap();
-                    let user_endpoint = client_map.get_by_left(&user.id).unwrap();
+                    let user_endpoint = client_map.get_by_left(user).unwrap();
                     handler.network().send(user_endpoint.clone(), &to_send);
                 };
 
@@ -72,13 +79,13 @@ pub fn main() {
                             Some(state) => {
                                 match state {
                                     UserState::Idle => {
-                                        lobby.login(user);
+                                        lobby.login(user.id.clone());
 
                                     }
                                     UserState::Matchmaking => {
                                         // 断线后取消匹配
                                         user_states.insert(user.id.clone(), UserState::Idle);
-                                        lobby.login(user);
+                                        lobby.login(user.id.clone());
                                     }
                                     UserState::Playing(room) => {
                                         // TODO 断线重连
@@ -90,7 +97,7 @@ pub fn main() {
                     // 加入房间
                     C2SMessage::JoinRoom(room_name) => {
                         let user = get_user().unwrap();
-                        let result = lobby.join_room(&room_name, user.clone());
+                        let result = lobby.join_room(&room_name, user.id.clone());
                         match result {
                             Ok(room) => {
                                 send_to_client(&S2CMessage::RoomJoined(room_name.clone()));
@@ -107,8 +114,8 @@ pub fn main() {
                                         match room.start_game() {
                                             Ok((landlord_player, players)) => {
                                                 for player in players {
-                                                    send_to_user(&player.user, &S2CMessage::GameStarted(player.cards.clone(), landlord_player.user.id.clone()));
-                                                    user_states.insert(player.user.id.clone(), UserState::Playing(room_name.clone()));
+                                                    send_to_user(&player.user, &S2CMessage::GameStarted(player.cards.clone(), landlord_player.user.clone()));
+                                                    user_states.insert(player.user.clone(), UserState::Playing(room_name.clone()));
                                                 }
                                             }
                                             Err(err) => {
@@ -130,8 +137,8 @@ pub fn main() {
                             match room.start_game() {
                                 Ok((landlord_player, players)) => {
                                     for player in players {
-                                        send_to_user(&player.user, &S2CMessage::GameStarted(player.cards.clone(), landlord_player.user.id.clone()));
-                                        user_states.insert(player.user.id.clone(), UserState::Playing(room_name.clone()));
+                                        send_to_user(&player.user, &S2CMessage::GameStarted(player.cards.clone(), landlord_player.user.clone()));
+                                        user_states.insert(player.user.clone(), UserState::Playing(room_name.clone()));
                                     }
                                 }
                                 Err(err) => {
@@ -150,24 +157,29 @@ pub fn main() {
                         };
 
                         if let Some(room) = room {
+                            // 尚未开始叫地主阶段
                             if room.game.state != GameState::WaitingForLandlord {
                                 send_to_client(&S2CMessage::RoomErr(RoomError::NotStarted));
                             }
-                            if room.game.players[room.game.landlord_index].user != get_user().unwrap() {
+                            // 不是当前的地主玩家
+                            if room.game.players[room.game.landlord_index].user != get_user().unwrap().id {
                                 send_to_client(&S2CMessage::RoomErr(RoomError::NotLandlordPlayer));
                             }
-                            if choose {
+                            if choose { // 叫地主
                                 room.game.run().expect("Game cannot run");
+                                // 通知所有玩家地主人选
                                 for player in room.game.players.iter() {
-                                    send_to_user(&player.user, &S2CMessage::LordCards(room.game.current_player().user.id.clone(), room.game.landlord_cards.clone()))
+                                    send_to_user(&player.user, &S2CMessage::LordCards(room.game.current_player().user.clone(), room.game.landlord_cards.clone()))
                                 }
-                            } else {
+                            } else { // 不叫
                                 room.game.move_landlord_index();
+                                // 通知下一个地主
                                 for player in room.game.players.iter() {
-                                    send_to_user(&player.user, &S2CMessage::LandlordMove(room.game.landlord_player().user.id.clone()))
+                                    send_to_user(&player.user, &S2CMessage::LandlordMove(room.game.landlord_player().user.clone()))
                                 }
                             }
                         } else {
+                            // 房间还未准备好
                             send_to_client(&S2CMessage::RoomErr(RoomError::NotReady));
                         }
                     }
@@ -181,7 +193,7 @@ pub fn main() {
                         if let Some(room) = room {
                             if room.game.state != GameState::Running {
                                 send_to_client(&S2CMessage::RoomErr(RoomError::NotReady));
-                            } else if room.game.current_player().user != get_user().unwrap() {
+                            } else if room.game.current_player().user != get_user().unwrap().id {
                                 send_to_client(&S2CMessage::GameErr(GameError::NotYourTurn));
                             } else {
                                 match room.game.pass() {
@@ -209,7 +221,7 @@ pub fn main() {
                         if let Some(room) = room {
                             if room.game.state != GameState::Running {
                                 send_to_client(&S2CMessage::RoomErr(RoomError::NotReady));
-                            } else if room.game.current_player().user != get_user().unwrap() {
+                            } else if room.game.current_player().user != get_user().unwrap().id {
                                 send_to_client(&S2CMessage::GameErr(GameError::NotYourTurn));
                             } else {
                                 match room.game.submit_cards(cards.clone()) {
@@ -240,7 +252,7 @@ pub fn main() {
             NetEvent::Disconnected(endpoint) => {
                 println!("{} Disconnected", endpoint);
                 if let Some(user) = client_map.get_by_right(&endpoint).map(|x| user_manager.get_user(x).unwrap()) {
-                    lobby.disconnect(&user);
+                    lobby.disconnect(&user.id);
                     user_states.remove(&user.id);
                 }
                 let client = clients

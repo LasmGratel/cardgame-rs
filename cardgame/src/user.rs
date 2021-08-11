@@ -15,8 +15,10 @@ pub struct User {
 
     /// 积分
     pub score: i64,
-
 }
+
+/// 用户标识符
+pub type UserId = String;
 
 impl User {
     pub fn new(id: String) -> User {

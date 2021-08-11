@@ -1,15 +1,26 @@
 use crate::card::*;
 
+/// 出牌规则
 pub trait Rule {
+    /// 同规则下是否可被顶替
     fn matches(&self, cards: &Vec<Card>) -> bool;
+
+    /// 规则名称
     fn to_string(&self) -> &str;
+
+    /// 是否为空规则
     fn is_none(&self) -> bool {
         false
     }
+
+    /// 是否为炸弹
+    ///
+    /// 0 为普通规则，1 为炸弹，2 为火箭
     fn bomb_priority(&self) -> u32 {
         0
     }
 }
+
 /// 单
 pub struct RuleOne {
     card: Card,
@@ -64,6 +75,7 @@ pub struct RuleAirplaneWithTwoWings {
     count: u32,
 }
 
+/// 可被任何规则覆盖的空规则
 pub struct RuleNone;
 
 impl Rule for RuleNone {
