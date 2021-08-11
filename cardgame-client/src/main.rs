@@ -227,10 +227,10 @@ fn run_console_thread(
                 if *client_state.lock().unwrap() == ClientState::Gaming {
                     let str = line.trim_start_matches("出牌 ");
                     let cards = parse_input(str);
-                    if cards.is_empty() {
+                    if cards.is_none() {
                         println!("你没有出任何牌！")
                     } else {
-                        let data = bincode::serialize(&C2SMessage::SubmitCards(cards)).unwrap();
+                        let data = bincode::serialize(&C2SMessage::SubmitCards(cards.unwrap())).unwrap();
                         handler.network().send(server_id.clone(), &data);
                     }
                 } else {

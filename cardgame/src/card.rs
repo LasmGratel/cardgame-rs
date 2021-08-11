@@ -118,7 +118,7 @@ impl PartialEq for CardGroup {
 }
 
 impl CardGroup {
-    pub fn to_cards(self) -> Vec<Card> {
+    pub fn into_cards(self) -> Vec<Card> {
         vec![self.card; self.count as usize]
     }
 }
@@ -181,8 +181,8 @@ impl CardGroups {
         self.groups.len() == 1 && self.has_group(count)
     }
 
-    pub fn to_cards(self) -> Vec<Card> {
-        self.groups.into_iter().flat_map(|x| x.to_cards()).collect()
+    pub fn into_cards(self) -> Vec<Card> {
+        self.groups.into_iter().flat_map(|x| x.into_cards()).collect()
     }
 }
 

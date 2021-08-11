@@ -201,7 +201,7 @@ impl Game {
                 return Err(self.win());
             }
 
-            self.players[self.index].cards = option.unwrap().to_cards();
+            self.players[self.index].cards = option.unwrap().into_cards();
 
             self.last_rule = rule;
             self.last_cards = cards;
@@ -270,12 +270,12 @@ pub fn gen_cards() -> Vec<Card> {
     return cards;
 }
 
-pub fn parse_input(input: &str) -> Vec<Card> {
+pub fn parse_input(input: &str) -> Option<Vec<Card>> {
     let input = input.to_ascii_uppercase().replace("10", "ß");
     let input = input.replace("1", "0");
     let input = input.replace("ß", "1");
     let cards_regex = Regex::new("([1-9jqkaJQKA]|鬼|王)+").unwrap();
-    let result = cards_regex.find(input.as_str()).expect("Cards not valid");
+    let result = cards_regex.find(input.as_str())?;
     let result = result.as_str().replace("10", "1");
 
     let mut vec: Vec<Card> = Vec::new();
@@ -283,5 +283,9 @@ pub fn parse_input(input: &str) -> Vec<Card> {
         vec.push(Card::from_char(&c));
     }
     vec.retain(|&i| i != Card::Unknown);
-    vec
+    if vec.is_empty() {
+        None
+    } else {
+        Some(vec)
+    }
 }

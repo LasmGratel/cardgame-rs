@@ -4,7 +4,32 @@ extern crate regex;
 extern crate serde;
 extern crate serde_json;
 #[cfg(test)]
-mod tests {}
+mod tests {
+    use crate::{parse_input, match_rule, to_card_groups};
+
+    mod rules {
+        use crate::{match_rule, parse_input, Rule};
+
+        fn rule_from_str(input: &str) -> Box<dyn Rule> {
+            match_rule(&parse_input(input).unwrap())
+        }
+
+        #[test]
+        fn one() {
+            let rule = rule_from_str("4");
+            assert!(rule.matches(&parse_input("2").unwrap()));
+            assert!(!rule.matches(&parse_input("3").unwrap()));
+        }
+    }
+
+    #[test]
+    fn random_inputs() {
+        let input = "123";
+        let cards = parse_input(input).unwrap();
+        let rule = match_rule(&cards);
+        assert!(rule.is_none());
+    }
+}
 
 pub enum Signal {
     Greet,
