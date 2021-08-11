@@ -145,7 +145,7 @@ impl UserManager {
         let path = Path::new(&self.path).join(id);
         let str = fs::read_to_string(path);
         if str.is_ok() {
-            serde_json::from_str(&str.unwrap()).map_err(|e| ())
+            serde_json::from_str(&str.unwrap()).map_err(|_| ())
         } else {
             Err(())
         }

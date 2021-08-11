@@ -7,6 +7,10 @@ use rand::Rng;
 use regex::Regex;
 use serde::{Serialize, Deserialize};
 use std::slice::Iter;
+use crate::user::UserId;
+
+/// 基础积分
+const BASE_POINTS: u32 = 100;
 
 #[derive(PartialEq, Eq)]
 pub enum GameState {
@@ -41,6 +45,8 @@ pub struct Game {
     pub landlord_cards: Vec<Card>,
 
     /// 积分倍率
+    /// 炸弹，火箭会*=2
+    /// 加倍 *=2，超级加倍 *=4
     pub score_multiplier: u32,
 }
 
@@ -88,6 +94,7 @@ impl Game {
         }
     }
 
+    #[cfg(debug_assertions)]
     pub fn print_cards(&self) {
         for p in self.players.iter() {
             print!("{}: ", p.user);
@@ -98,9 +105,16 @@ impl Game {
         }
     }
 
+    #[cfg(not(debug_assertions))]
+    pub fn print_cards(&self) {}
+
+    #[cfg(debug_assertions)]
     pub fn print_player(&self) {
         println!("轮到 {} 出牌", self.current_player().user);
     }
+
+    #[cfg(not(debug_assertions))]
+    pub fn print_player(&self) {}
 
     pub fn landlord_player(&self) -> &Player {
         &self.players[self.landlord_index]
@@ -133,24 +147,20 @@ impl Game {
         Ok((&self.players[self.landlord_index], self.players.iter()))
     }
 
-    pub fn win(&mut self) {
+    pub fn win(&mut self) -> GameError {
+        #[cfg(debug_assertions)]
         match self.current_player().player_type {
             PlayerType::Landlord => {
-                println!("{} 赢了！", self.current_player().user);
+                println!("地主赢了！");
             }
             PlayerType::Farmer => {
-                for p in self
-                    .players
-                    .iter()
-                    .filter(|x| x.player_type == PlayerType::Farmer)
-                {
-                    println!("{} 赢了！", self.current_player().user);
-                    // TODO 结算
-                }
+                println!("农民赢了！");
             }
         }
         self.print_cards();
+
         self.state = GameState::WaitingForPlayers;
+        GameError::Win(self.current_player().user.clone(), self.current_player().player_type.clone(), BASE_POINTS * self.score_multiplier)
     }
 
     pub fn pass(&mut self) -> Result<String, GameError> {
@@ -172,16 +182,23 @@ impl Game {
             if option.is_none() {
                 return Err(GameError::NoSuchCards);
             }
-            print!("{} 出牌：", self.current_player().user);
-            for c in cards.iter() {
-                print!("[{}]", c.to_string());
+
+            #[cfg(debug_assertions)] {
+                print!("{} 出牌：", self.current_player().user);
+                for c in cards.iter() {
+                    print!("[{}]", c.to_string());
+                }
+                println!();
             }
-            println!();
+
+            // 炸弹积分翻倍
+            if rule.bomb_priority() == 1 || rule.bomb_priority() == 2 {
+                self.score_multiplier *= 2;
+            }
 
             // 赢得胜利
             if self.current_player().cards.is_empty() {
-                self.win();
-                return Err(GameError::Win(self.current_player().user.clone()));
+                return Err(self.win());
             }
 
             self.players[self.index].cards = option.unwrap().to_cards();
@@ -219,7 +236,7 @@ impl Game {
 
         self.state = GameState::Running;
 
-        // 显示信息
+        // 显示调试信息
         self.print_cards();
         self.print_player();
 
@@ -232,7 +249,8 @@ pub enum GameError {
     NotRunning, NotYourTurn, NoSuchCards, WrongRule,
 
     /// 这把赢了
-    Win(String),
+    /// 参数：最后出掉牌的玩家，玩家类型，获得的积分
+    Win(UserId, PlayerType, u32),
 
     /// 过你马呢
     YourTurn

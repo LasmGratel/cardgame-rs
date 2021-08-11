@@ -38,7 +38,7 @@ impl Room {
         if self.state != RoomState::Ready {
             Err(RoomError::NotReady)
         } else {
-            self.game.start().map_err(|e| RoomError::NotReady) // TODO
+            self.game.start().map_err(|e| RoomError::NotReady) // TODO 处理错误
         }
     }
 }

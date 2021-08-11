@@ -8,10 +8,6 @@ use crate::server_lobby::ServerLobby;
 
 pub mod server_lobby;
 
-pub fn get_room_by_endpoint(endpoint: &Endpoint) {
-
-}
-
 pub fn main() {
     // Create a node, the main message-io entity. It is divided in 2 parts:
     // The 'handler', used to make actions (connect, send messages, signals, stop the node...)
@@ -232,7 +228,12 @@ pub fn main() {
                                         }
                                     }
                                     Err(e) => {
-                                        send_to_client(&S2CMessage::GameErr(e));
+                                        match e {
+                                            GameError::Win(user, player_type, score) => {
+                                                // TODO 结算并写入文件
+                                            }
+                                            _ => send_to_client(&S2CMessage::GameErr(e))
+                                        }
                                     }
                                 }
                             }

@@ -120,7 +120,7 @@ fn run_network_thread(
                                 GameError::WrongRule => {
                                     println!("你出的牌不满足当前规则");
                                 }
-                                GameError::Win(player) => {
+                                GameError::Win(player, player_type, score) => {
                                     println!("{} 赢了。", player);
                                     *client_state.lock().unwrap() = ClientState::Idle;
                                 }

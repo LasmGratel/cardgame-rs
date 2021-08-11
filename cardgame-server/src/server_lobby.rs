@@ -1,5 +1,5 @@
 use cardgame::{Lobby, Room, Game, LobbyError, RoomState};
-use cardgame::user::{User, UserId};
+use cardgame::user::UserId;
 use std::collections::HashMap;
 
 pub struct ServerLobby {
