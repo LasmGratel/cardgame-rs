@@ -9,6 +9,7 @@ use message_io::node::*;
 use std::sync::mpsc::*;
 use std::thread::JoinHandle;
 use std::sync::{Mutex, Arc};
+use std::time::Duration;
 
 /// 客户端状态
 #[derive(Eq, PartialEq, Clone)]
@@ -39,7 +40,7 @@ fn run_network_thread(
         let (user_name, client_state, cards_mutex, landlord_name) = mutexs;
         listener.for_each(move |event| match event {
             NodeEvent::Signal(signal) => match signal {
-                crate::Signal::Greet => {
+                cardgame::Signal::Greet => {
                     /*
                     let message = C2SMessage::Ping;
                     let output_data = bincode::serialize(&message).unwrap();
@@ -48,6 +49,7 @@ fn run_network_thread(
                         .signals()
                         .send_with_timer(crate::Signal::Greet, Duration::from_secs(1));*/
                 }
+                _ => {}
             },
             NodeEvent::Network(net_event) => match net_event {
                 NetEvent::Message(_, input_data) => {
@@ -155,7 +157,12 @@ fn run_network_thread(
                 NetEvent::Disconnected(_) => {
                     println!("Server is disconnected");
                     handler.stop();
-                }
+                },
+                NodeEvent::Signal(signal) => match signal {
+                    Signal::Greet => {
+                        handler.signals().send_with_timer(Signal::Greet, Duration::from_secs(1));
+                    }
+                },
             },
         });
     })
@@ -281,6 +288,13 @@ fn run_console_thread(
                             handler.network().send(server_id.clone(), &data);
                         } else {
                             println!("你现在还不能过牌！");
+                        }
+                    }
+                    "匹配" => {
+                        if *client_state.lock().unwrap() != ClientState::Idle {
+                            println!("此时还不能加入匹配队列！");
+                        } else {
+                            send_to_server(&C2SMessage::Matchmake);
                         }
                     }
                     "游戏列表" => {

@@ -3,6 +3,7 @@ extern crate num_traits;
 extern crate regex;
 extern crate serde;
 extern crate serde_json;
+extern crate rand;
 #[cfg(test)]
 mod tests {
     use crate::{parse_input, match_rule, to_card_groups};
@@ -32,7 +33,7 @@ mod tests {
 }
 
 pub enum Signal {
-    Greet,
+    Greet, Matchmake
 }
 
 pub mod card;
@@ -49,3 +50,4 @@ pub use lobby::*;
 pub use messages::*;
 pub use player::*;
 pub use rule::*;
+pub use rand::thread_rng;

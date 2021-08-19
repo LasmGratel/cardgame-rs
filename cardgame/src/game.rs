@@ -246,7 +246,7 @@ impl Game {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum GameError {
     NotRunning, NotYourTurn, NoSuchCards, WrongRule, NoRule,
 
