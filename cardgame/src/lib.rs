@@ -51,3 +51,4 @@ pub use messages::*;
 pub use player::*;
 pub use rule::*;
 pub use rand::thread_rng;
+pub use rand::seq::SliceRandom;

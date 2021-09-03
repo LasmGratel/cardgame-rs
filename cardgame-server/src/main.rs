@@ -17,15 +17,15 @@ pub fn main() {
     let (handler, listener) = node::split::<cardgame::Signal>();
 
     let network_handle = std::thread::spawn(|| {
-        let addr = "0.0.0.0:3042";
+        let address = "0.0.0.0:3042";
 
         // Listen for TCP, UDP and WebSocket messages at the same time.
         handler
             .network()
-            .listen(Transport::FramedTcp, addr)
+            .listen(Transport::FramedTcp, address)
             .expect("Unable to listen on the address!");
 
-        println!("Server listening on {}", addr);
+        println!("服务器在 {} 上监听", address);
 
         let mut lobby = ServerLobby::new();
         let mut clients: Vec<Endpoint> = vec![];
@@ -36,7 +36,7 @@ pub fn main() {
         let mut matchmake_timer = 0;
         let mut rng = thread_rng();
 
-        println!("Server initialized");
+        println!("初始化完毕");
 
         // Read incoming network events.
         listener.for_each(move |event| match event {
@@ -65,10 +65,10 @@ pub fn main() {
                     let message: C2SMessage = bincode::deserialize(&data).unwrap();
                     match message {
                         C2SMessage::Ping => {
-                            println!("Ping from client")
+                            println!("客户端 Ping")
                         }
                         C2SMessage::Login(username) => {
-                            println!("User {} Logged in", username);
+                            println!("玩家 {} 登入", username);
                             send_to_client(&S2CMessage::LoggedIn);
 
                             client_map.insert(username.clone(), endpoint.clone());

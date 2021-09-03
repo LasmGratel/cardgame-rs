@@ -158,11 +158,6 @@ fn run_network_thread(
                     println!("Server is disconnected");
                     handler.stop();
                 },
-                NodeEvent::Signal(signal) => match signal {
-                    Signal::Greet => {
-                        handler.signals().send_with_timer(Signal::Greet, Duration::from_secs(1));
-                    }
-                },
             },
         });
     })

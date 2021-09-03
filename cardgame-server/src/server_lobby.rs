@@ -1,10 +1,13 @@
 use cardgame::{Lobby, Room, Game, LobbyError, RoomState};
-use cardgame::user::UserId;
+use cardgame::user::{UserId, UserState};
 use std::collections::HashMap;
 
 pub struct ServerLobby {
     /// 大厅玩家列表
     pub users: Vec<UserId>,
+
+    /// 玩家状态
+    pub user_states: HashMap<UserId, UserState>,
 
     /// 匹配中的玩家列表
     pub waiting_list: Vec<UserId>,
@@ -20,6 +23,7 @@ impl ServerLobby {
     pub fn new() -> ServerLobby {
         ServerLobby {
             users: vec![],
+            user_states: HashMap::new(),
             waiting_list: vec![],
             rooms: HashMap::new(),
             games: HashMap::new(),
@@ -49,7 +53,10 @@ impl ServerLobby {
 
 impl Lobby for ServerLobby {
     fn login(&mut self, user: String) {
-        self.users.push(user);
+        self.users.push(user.clone());
+        // if !self.user_states.contains_key(&user) {
+        //     self.user_states.insert(user, UserState::Idle);
+        // }
     }
 
     fn disconnect(&mut self, user: &String) {
