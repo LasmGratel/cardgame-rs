@@ -15,6 +15,7 @@ mod tests {
             match_rule(&parse_input(input).unwrap())
         }
 
+        /// 测试单牌规则
         #[test]
         fn one() {
             let rule = rule_from_str("4");
@@ -23,6 +24,7 @@ mod tests {
         }
     }
 
+    /// 测试不符合规则的乱敲
     #[test]
     fn random_inputs() {
         let input = "123";

@@ -198,12 +198,12 @@ impl Game {
                 self.score_multiplier *= 2;
             }
 
+            self.players[self.index].cards = option.unwrap().into_cards();
+
             // 赢得胜利
             if self.current_player().cards.is_empty() {
                 return Err(self.win());
             }
-
-            self.players[self.index].cards = option.unwrap().into_cards();
 
             self.last_rule = rule;
             self.last_cards = cards;
