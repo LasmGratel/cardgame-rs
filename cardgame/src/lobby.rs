@@ -8,12 +8,12 @@ pub struct Room {
     pub users: Vec<UserId>,
     pub game: Game,
     pub game_name: String,
-    pub state: RoomState
+    pub state: RoomState,
 }
 
-#[derive(Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Serialize, Deserialize, Eq, PartialEq, Clone)]
 pub enum RoomState {
-    Waiting, Ready
+    Waiting, Ready, WaitingForRematch(u32)
 }
 
 impl Room {

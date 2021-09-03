@@ -23,6 +23,10 @@ enum ClientState {
     /// 在房间中等待玩家
     WaitingForPlayers(String),
 
+    /// 等待重新比赛
+    WaitingForRematch,
+
+    /// 等待叫地主
     WaitingForLandlord,
 
     /// 游戏中
@@ -128,8 +132,21 @@ fn run_network_thread(
                                 GameError::Win(player, player_type, score) => {
                                     println!("{} 赢了。", player);
                                     *client_state.lock().unwrap() = ClientState::Idle;
+                                    *landlord_name.lock().unwrap() = String::new();
+                                    cards_mutex.lock().unwrap().clear();
+
+                                    println!("现在你可以输入 再来一局|摸了 来进行重新比赛投票，也可以安全地离开房间。");
                                 }
                                 _ => {}
+                            }
+                        }
+                        S2CMessage::RematchVote(player, rematch, count) => {
+                            if rematch {
+                                println!("{} 同意再来一局。({}/3)", player, count);
+                            } else {
+                                println!("{} 不同意再来一局，房间销毁。", player);
+                                *client_state.lock().unwrap() = ClientState::Idle;
+                                cards_mutex.lock().unwrap().clear();
                             }
                         }
                         S2CMessage::GameStarted(cards, landlord) => {
@@ -147,6 +164,14 @@ fn run_network_thread(
                             *cards_mutex.lock().unwrap() = cards;
                             *landlord_name.lock().unwrap() = landlord;
                             *client_state.lock().unwrap() = ClientState::WaitingForLandlord;
+                        }
+                        S2CMessage::MatchmakeStatus(count, expected_time, remaining_time) => {
+                            if remaining_time.is_zero() {
+                                println!("无法匹配到玩家，请重试。");
+                                *client_state.lock().unwrap() = ClientState::Idle;
+                            } else {
+                                println!("当前匹配队列共有 {} 位玩家，剩余匹配时间：{}s", count, remaining_time.as_secs());
+                            }
                         }
                         _ => {
                             sender.send(message).expect("Cannot send message");
@@ -259,6 +284,26 @@ fn run_console_thread(
                             println!("不是你叫地主！")
                         } else {
                             send_to_server(&C2SMessage::ChooseLandlord(false));
+                        }
+                    }
+                    "再来一局" => {
+                        if client_state.lock().unwrap().clone() == ClientState::WaitingForRematch {
+                            let data =
+                                bincode::serialize(&C2SMessage::RematchVote(true))
+                                    .unwrap();
+                            handler.network().send(server_id.clone(), &data);
+                        } else {
+                            println!("此时还不能进行重新比赛投票！");
+                        }
+                    }
+                    "摸了" => {
+                        if client_state.lock().unwrap().clone() == ClientState::WaitingForRematch {
+                            let data =
+                                bincode::serialize(&C2SMessage::RematchVote(false))
+                                    .unwrap();
+                            handler.network().send(server_id.clone(), &data);
+                        } else {
+                            println!("此时还不能进行重新比赛投票！");
                         }
                     }
                     "开始游戏" => {
@@ -382,22 +427,20 @@ fn run() {
 
 fn main() {
     let transport = Transport::FramedTcp;
-    let remote_addr = "127.0.0.1:3042".to_remote_addr().unwrap();
+    let remote_addr = "origind.cn:3042".to_remote_addr().unwrap();
     let (handler, listener) = node::split();
 
     let server_id = match handler.network().connect(transport, remote_addr.clone()) {
         Ok((server_id, local_addr)) => {
             println!(
-                "Connected to server by {} at {}",
-                transport,
-                server_id.addr()
+                "连接至服务器 {}", remote_addr
             );
-            println!("Client identified by local port: {}", local_addr.port());
+            println!("本地端口: {}", local_addr.port());
             server_id
         }
         Err(_) => {
             return println!(
-                "Can not connect to the server by {} to {}",
+                "无法使用 {} 协议连接到 {}",
                 transport, remote_addr
             )
         }

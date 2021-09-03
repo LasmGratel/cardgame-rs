@@ -120,6 +120,16 @@ impl Game {
         &self.players[self.landlord_index]
     }
 
+    pub fn reset(&mut self) {
+        self.last_cards.clear();
+        self.last_rule = Box::new(RuleNone);
+        self.index = 0;
+        self.last_index = 0;
+        self.landlord_index = 0;
+        self.landlord_cards.clear();
+        self.score_multiplier = 1;
+    }
+
     pub fn start(&mut self) -> Result<(&Player, Iter<Player>), &str> {
         if self.players.len() != 3 {
             return Err("玩家数不够!");
