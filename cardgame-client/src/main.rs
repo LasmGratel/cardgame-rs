@@ -427,7 +427,7 @@ fn run() {
 
 fn main() {
     let transport = Transport::FramedTcp;
-    let remote_addr = "origind.cn:3042".to_remote_addr().unwrap();
+    let remote_addr = "1.117.73.154:3042".to_remote_addr().unwrap();
     let (handler, listener) = node::split();
 
     let server_id = match handler.network().connect(transport, remote_addr.clone()) {
