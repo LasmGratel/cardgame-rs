@@ -1,8 +1,10 @@
 use cardgame::{Lobby, Room, Game, LobbyError, RoomState};
 use cardgame::user::{UserId, UserState};
 use std::collections::HashMap;
+use message_io::network::NetworkController;
 
-pub struct ServerLobby {
+/// 大厅的服务器实现。
+pub struct ServerLobby<'a> {
     /// 大厅玩家列表
     pub users: Vec<UserId>,
 
@@ -17,16 +19,19 @@ pub struct ServerLobby {
 
     /// 所有进行中的游戏
     pub games: HashMap<String, Game>,
+
+    network: &'a NetworkController,
 }
 
-impl ServerLobby {
-    pub fn new() -> ServerLobby {
+impl ServerLobby<'_> {
+    pub fn new(network: &NetworkController) -> ServerLobby {
         ServerLobby {
             users: vec![],
             user_states: HashMap::new(),
             waiting_list: vec![],
             rooms: HashMap::new(),
             games: HashMap::new(),
+            network
         }
     }
 
@@ -51,7 +56,7 @@ impl ServerLobby {
     }
 }
 
-impl Lobby for ServerLobby {
+impl Lobby for ServerLobby<'_> {
     fn login(&mut self, user: String) {
         self.users.push(user.clone());
         // if !self.user_states.contains_key(&user) {
@@ -65,3 +70,8 @@ impl Lobby for ServerLobby {
         }
     }
 }
+
+pub struct NetworkManager<'a> {
+    network: &'a NetworkController,
+}
+
