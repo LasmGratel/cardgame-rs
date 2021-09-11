@@ -6,7 +6,7 @@ extern crate serde_json;
 extern crate rand;
 #[cfg(test)]
 mod tests {
-    use crate::{parse_input, match_rule, to_card_groups};
+    use crate::{parse_input, match_rule};
 
     mod rules {
         use crate::{match_rule, parse_input, Rule};

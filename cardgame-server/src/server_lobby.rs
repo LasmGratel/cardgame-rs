@@ -1,7 +1,9 @@
-use cardgame::{Lobby, Room, Game, LobbyError, RoomState};
-use cardgame::user::{UserId, UserState};
 use std::collections::HashMap;
+
 use message_io::network::NetworkController;
+
+use cardgame::user::{UserId, UserState};
+use cardgame::{Game, Lobby, LobbyError, Room, RoomState};
 
 /// 大厅的服务器实现。
 pub struct ServerLobby<'a> {
@@ -31,13 +33,14 @@ impl ServerLobby<'_> {
             waiting_list: vec![],
             rooms: HashMap::new(),
             games: HashMap::new(),
-            network
+            network,
         }
     }
 
     pub fn join_room(&mut self, room_name: &String, user: String) -> Result<&Room, LobbyError> {
         if !self.rooms.contains_key(room_name) {
-            self.rooms.insert(room_name.clone(), Room::new(room_name.clone()));
+            self.rooms
+                .insert(room_name.clone(), Room::new(room_name.clone()));
             println!("创建房间: {}", room_name);
         };
         let mut room = self.rooms.get_mut(room_name).unwrap();
@@ -64,7 +67,7 @@ impl Lobby for ServerLobby<'_> {
         // }
     }
 
-    fn disconnect(&mut self, user: &String) {
+    fn disconnect(&mut self, user: &str) {
         if let Some(pos) = self.users.iter().position(|x| x == user) {
             self.users.remove(pos);
         }
@@ -74,4 +77,3 @@ impl Lobby for ServerLobby<'_> {
 pub struct NetworkManager<'a> {
     network: &'a NetworkController,
 }
-

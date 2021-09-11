@@ -7,7 +7,6 @@ use std::collections::HashMap;
 use crate::server_lobby::ServerLobby;
 use message_io::node::NodeEvent;
 use std::time::Duration;
-use std::rc::Rc;
 
 pub mod server_lobby;
 

@@ -189,7 +189,7 @@ impl Game {
         let rule = match_rule(&cards);
         if rule.is_none() {
             Err(GameError::NoRule)
-        } else if rule_matches(&self.last_rule, &cards) || self.index == self.last_index {
+        } else if rule_matches(&*self.last_rule, &cards) || self.index == self.last_index {
             let option = to_card_groups(&self.current_player().cards) - to_card_groups(&cards);
             if option.is_none() {
                 return Err(GameError::NoSuchCards);
@@ -253,6 +253,12 @@ impl Game {
         self.print_player();
 
         Ok(())
+    }
+}
+
+impl Default for Game {
+    fn default() -> Self {
+        Game::new()
     }
 }
 

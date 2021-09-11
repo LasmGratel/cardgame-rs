@@ -61,7 +61,7 @@ pub trait Lobby {
     fn login(&mut self, user: String);
 
     /// 玩家断连
-    fn disconnect(&mut self, user: &String);
+    fn disconnect(&mut self, user: &str);
 }
 
 #[derive(Serialize, Deserialize)]

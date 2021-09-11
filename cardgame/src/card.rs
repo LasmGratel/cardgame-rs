@@ -89,7 +89,7 @@ impl Card {
     }
 
     pub fn from_value(i: u32) -> Card {
-        return Card::from_u32(i).unwrap_or(Card::Unknown);
+        Card::from_u32(i).unwrap_or(Card::Unknown)
     }
 }
 
@@ -130,17 +130,14 @@ impl std::ops::Sub<CardGroups> for CardGroups {
             return None;
         }
         let mut groups = CardGroups {
-            groups: self.groups.clone(),
+            groups: self.groups,
         };
         for c in groups.groups.iter_mut() {
-            let group = rhs.find_group_by_card(c.card);
-            if group.is_some() {
-                let group = group.unwrap();
-                if c.count < group.count {
-                    return None;
-                }
-                c.count -= group.count;
+            let group = rhs.find_group_by_card(c.card)?;
+            if c.count < group.count {
+                return None;
             }
+            c.count -= group.count;
         }
         groups.groups.retain(|x| x.count > 0);
         groups.groups.sort();
@@ -186,7 +183,7 @@ impl CardGroups {
     }
 }
 
-pub fn to_card_groups(vec: &Vec<Card>) -> CardGroups {
+pub fn to_card_groups(vec: &[Card]) -> CardGroups {
     let mut arr = [0u32; 16];
     for c in vec {
         arr[c.value() as usize] += 1;
@@ -201,5 +198,5 @@ pub fn to_card_groups(vec: &Vec<Card>) -> CardGroups {
         }
     }
     groups.groups.sort();
-    return groups;
+    groups
 }
