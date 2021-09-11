@@ -4,6 +4,7 @@ extern crate regex;
 extern crate serde;
 extern crate serde_json;
 extern crate rand;
+extern crate anyhow;
 #[cfg(test)]
 mod tests {
     use crate::{parse_input, match_rule};

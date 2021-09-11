@@ -282,7 +282,7 @@ pub fn main() {
                                                     GameError::Win(user, player_type, score) => {
                                                         // TODO 结算并写入文件
 
-                                                        user_states.insert(user.clone(), UserState::Idle);
+                                                        user_states.insert(user, UserState::Idle);
                                                         room.state = RoomState::WaitingForRematch(0);
                                                     }
                                                     _ => {}

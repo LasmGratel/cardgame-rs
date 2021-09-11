@@ -88,14 +88,13 @@ impl UserManager {
         self.write();
     }
 
-    pub fn get_user_mut(&mut self, id: &String) -> &mut User {
-        if self.cache.contains_key(id) {
-            self.cache.get_mut(id).unwrap()
-        } else {
+    pub fn get_user_mut(&mut self, id: &str) -> &mut User {
+        if !self.cache.contains_key(id) {
             let user = self.read_user_or_create(id);
-            self.cache.insert(id.clone(), user);
-            self.cache.get_mut(id).unwrap()
+            self.cache.insert(id.to_string(), user);
+
         }
+        self.cache.get_mut(id).unwrap()
     }
 
     pub fn write(&self) {
@@ -132,23 +131,19 @@ impl UserManager {
         }
     }
 
-    fn read_user_or_create(&self, id: &String) -> User {
+    fn read_user_or_create(&self, id: &str) -> User {
         if let Ok(user) = self.read_user(id) {
             user
         } else {
-            User::new(id.clone())
+            User::new(id.to_string())
         }
     }
 
     /// 从文件读取用户数据
-    fn read_user(&self, id: &String) -> Result<User, ()> {
+    fn read_user(&self, id: &str) -> Result<User, anyhow::Error> {
         let path = Path::new(&self.path).join(id);
-        let str = fs::read_to_string(path);
-        if str.is_ok() {
-            serde_json::from_str(&str.unwrap()).map_err(|_| ())
-        } else {
-            Err(())
-        }
+        let str = fs::read_to_string(path)?;
+        serde_json::from_str(&str).map_err(anyhow::Error::from)
     }
 
     /// 写入文件

@@ -40,7 +40,7 @@ impl ServerLobby<'_> {
     pub fn join_room(&mut self, room_name: &String, user: String) -> Result<&Room, LobbyError> {
         if !self.rooms.contains_key(room_name) {
             self.rooms
-                .insert(room_name.clone(), Room::new(room_name.clone()));
+                .insert(room_name.to_string(), Room::new(room_name.to_string()));
             println!("创建房间: {}", room_name);
         };
         let mut room = self.rooms.get_mut(room_name).unwrap();

@@ -57,7 +57,7 @@ fn run_network_thread(
             },
             NodeEvent::Network(net_event) => match net_event {
                 NetEvent::Message(_, input_data) => {
-                    let message: S2CMessage = bincode::deserialize(&input_data).unwrap();
+                    let message: S2CMessage = bincode::deserialize(input_data).unwrap();
                     match message {
                         S2CMessage::RoomJoined(room) => {
                             let mut state = client_state.lock().unwrap();
@@ -94,7 +94,7 @@ fn run_network_thread(
                             if *user_name.lock().unwrap() == landlord {
                                 let mut player_cards = cards_mutex.lock().unwrap();
                                 for card in cards.iter() {
-                                    player_cards.push(card.clone());
+                                    player_cards.push(*card);
                                     player_cards.sort();
                                 }
                                 print!("你的手牌：");
@@ -214,7 +214,7 @@ fn run_console_thread(
 
         let send_to_server = |msg: &C2SMessage| -> () {
             let data = bincode::serialize(msg).unwrap();
-            handler.network().send(server_id.clone(), &data);
+            handler.network().send(server_id, &data);
         };
 
         let line = read_line("请输入用户名：");
@@ -223,9 +223,9 @@ fn run_console_thread(
             return;
         }
         let user = line.to_string();
-        *user_name.lock().unwrap() = String::from(user.clone());
+        *user_name.lock().unwrap() = user.clone();
         let data = bincode::serialize(&C2SMessage::Login(user.clone())).unwrap();
-        handler.network().send(server_id.clone(), &data);
+        handler.network().send(server_id, &data);
         let msg = rx.recv().unwrap();
         match msg {
             S2CMessage::LoggedIn => {
@@ -251,7 +251,7 @@ fn run_console_thread(
                     return;
                 } else {
                     let data = bincode::serialize(&C2SMessage::JoinRoom(String::from(room))).unwrap();
-                    handler.network().send(server_id.clone(), &data);
+                    handler.network().send(server_id, &data);
                 }
             } else if line.starts_with("出牌 ") {
                 if *client_state.lock().unwrap() == ClientState::Gaming {
@@ -261,7 +261,7 @@ fn run_console_thread(
                         println!("你没有出任何牌！")
                     } else {
                         let data = bincode::serialize(&C2SMessage::SubmitCards(cards.unwrap())).unwrap();
-                        handler.network().send(server_id.clone(), &data);
+                        handler.network().send(server_id, &data);
                     }
                 } else {
                     println!("你现在还不能出牌！");
@@ -291,7 +291,7 @@ fn run_console_thread(
                             let data =
                                 bincode::serialize(&C2SMessage::RematchVote(true))
                                     .unwrap();
-                            handler.network().send(server_id.clone(), &data);
+                            handler.network().send(server_id, &data);
                         } else {
                             println!("此时还不能进行重新比赛投票！");
                         }
@@ -301,7 +301,7 @@ fn run_console_thread(
                             let data =
                                 bincode::serialize(&C2SMessage::RematchVote(false))
                                     .unwrap();
-                            handler.network().send(server_id.clone(), &data);
+                            handler.network().send(server_id, &data);
                         } else {
                             println!("此时还不能进行重新比赛投票！");
                         }
@@ -315,7 +315,7 @@ fn run_console_thread(
                                 let data =
                                     bincode::serialize(&C2SMessage::StartGame(room_name.clone()))
                                         .unwrap();
-                                handler.network().send(server_id.clone(), &data);
+                                handler.network().send(server_id, &data);
                             }
                             _ => {
                                 println!("游戏已开始或无法开始！")
@@ -325,7 +325,7 @@ fn run_console_thread(
                     "pass" => {
                         if *client_state.lock().unwrap() == ClientState::Gaming {
                             let data = bincode::serialize(&C2SMessage::Pass).unwrap();
-                            handler.network().send(server_id.clone(), &data);
+                            handler.network().send(server_id, &data);
                         } else {
                             println!("你现在还不能过牌！");
                         }
@@ -339,7 +339,7 @@ fn run_console_thread(
                     }
                     "游戏列表" => {
                         let data = bincode::serialize(&C2SMessage::QueryRoomList).unwrap();
-                        handler.network().send(server_id.clone(), &data);
+                        handler.network().send(server_id, &data);
                         let msg = rx.recv().unwrap();
                         if let S2CMessage::RoomList(lobbies) = msg {
                             for name in lobbies.iter() {
@@ -358,11 +358,11 @@ fn run_console_thread(
     })
 }
 
-fn print_cards(cards: &Vec<Card>) {
+fn print_cards(cards: &[Card]) {
     println!("{}", cards_to_string(cards));
 }
 
-fn cards_to_string(cards: &Vec<Card>) -> String {
+fn cards_to_string(cards: &[Card]) -> String {
     let mut s = String::new();
     for c in cards.iter() {
         s += "[";
@@ -457,8 +457,8 @@ fn main() {
 
     let (tx, rx) = channel();
 
-    run_network_thread(server_id.clone(), handler.clone(), listener, tx, mutexs.clone());
-    run_console_thread(server_id.clone(), handler.clone(), rx, mutexs.clone()).join().unwrap();
+    run_network_thread(server_id, handler.clone(), listener, tx, mutexs.clone());
+    run_console_thread(server_id, handler, rx, mutexs).join().unwrap();
 }
 
 pub mod device;
