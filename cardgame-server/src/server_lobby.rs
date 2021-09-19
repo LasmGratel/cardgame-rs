@@ -37,7 +37,7 @@ impl ServerLobby<'_> {
         }
     }
 
-    pub fn join_room(&mut self, room_name: &String, user: String) -> Result<&Room, LobbyError> {
+    pub fn join_room(&mut self, room_name: &str, user: String) -> Result<&Room, LobbyError> {
         if !self.rooms.contains_key(room_name) {
             self.rooms
                 .insert(room_name.to_string(), Room::new(room_name.to_string()));
@@ -61,7 +61,7 @@ impl ServerLobby<'_> {
 
 impl Lobby for ServerLobby<'_> {
     fn login(&mut self, user: String) {
-        self.users.push(user.clone());
+        self.users.push(user);
         // if !self.user_states.contains_key(&user) {
         //     self.user_states.insert(user, UserState::Idle);
         // }

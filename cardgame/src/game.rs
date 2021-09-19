@@ -285,7 +285,7 @@ pub fn gen_cards() -> Vec<Card> {
     cards.push(Card::CardKing);
 
     cards.shuffle(&mut thread_rng());
-    return cards;
+    cards
 }
 
 pub fn parse_input(input: &str) -> Option<Vec<Card>> {

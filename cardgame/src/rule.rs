@@ -417,54 +417,60 @@ impl Rule for RuleAirplaneWithTwoWings {
 }
 
 pub fn match_rule(cards: &[Card]) -> Box<dyn Rule> {
-    let option = RuleOne::try_new(cards);
-    if option.is_some() {
-        return Box::new(option.unwrap());
-    }
+    match cards.len() {
+        1 => {
+            let option = RuleOne::try_new(cards);
+            if option.is_some() {
+                return Box::new(option.unwrap());
+            }
+        }
+        2 => {
+            let option = RuleTwo::try_new(cards);
+            if option.is_some() {
+                return Box::new(option.unwrap());
+            }
 
-    let option = RuleTwo::try_new(cards);
-    if option.is_some() {
-        return Box::new(option.unwrap());
-    }
+            let option = RuleRocket::try_new(cards);
+            if option.is_some() {
+                return Box::new(option.unwrap());
+            }
+        }
+        4 => {
+            let option = RuleThreeWithOne::try_new(cards);
+            if option.is_some() {
+                return Box::new(option.unwrap());
+            }
+            let option = RuleBomb::try_new(cards);
+            if option.is_some() {
+                return Box::new(option.unwrap());
+            }
+        }
+        _ => {
+            let option = RuleThreeWithTwo::try_new(cards);
+            if option.is_some() {
+                return Box::new(option.unwrap());
+            }
 
-    let option = RuleThreeWithOne::try_new(cards);
-    if option.is_some() {
-        return Box::new(option.unwrap());
-    }
+            let option = RuleFourWithTwo::try_new(cards);
+            if option.is_some() {
+                return Box::new(option.unwrap());
+            }
 
-    let option = RuleThreeWithTwo::try_new(cards);
-    if option.is_some() {
-        return Box::new(option.unwrap());
-    }
+            let option = RuleChain::try_new(cards);
+            if option.is_some() {
+                return Box::new(option.unwrap());
+            }
 
-    let option = RuleFourWithTwo::try_new(cards);
-    if option.is_some() {
-        return Box::new(option.unwrap());
-    }
+            let option = RuleAirplaneWithOneWing::try_new(cards);
+            if option.is_some() {
+                return Box::new(option.unwrap());
+            }
 
-    let option = RuleBomb::try_new(cards);
-    if option.is_some() {
-        return Box::new(option.unwrap());
-    }
-
-    let option = RuleRocket::try_new(cards);
-    if option.is_some() {
-        return Box::new(option.unwrap());
-    }
-
-    let option = RuleChain::try_new(cards);
-    if option.is_some() {
-        return Box::new(option.unwrap());
-    }
-
-    let option = RuleAirplaneWithOneWing::try_new(cards);
-    if option.is_some() {
-        return Box::new(option.unwrap());
-    }
-
-    let option = RuleAirplaneWithTwoWings::try_new(cards);
-    if option.is_some() {
-        return Box::new(option.unwrap());
+            let option = RuleAirplaneWithTwoWings::try_new(cards);
+            if option.is_some() {
+                return Box::new(option.unwrap());
+            }
+        }
     }
 
     Box::new(RuleNone)

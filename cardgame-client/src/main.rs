@@ -9,7 +9,7 @@ use message_io::node::*;
 use std::sync::mpsc::*;
 use std::thread::JoinHandle;
 use std::sync::{Mutex, Arc};
-use std::time::Duration;
+
 
 /// 客户端状态
 #[derive(Eq, PartialEq, Clone)]
@@ -34,7 +34,7 @@ enum ClientState {
 }
 
 fn run_network_thread(
-    server_id: Endpoint,
+    _server_id: Endpoint,
     handler: NodeHandler<Signal>,
     listener: NodeListener<Signal>,
     sender: Sender<S2CMessage>,
@@ -257,11 +257,11 @@ fn run_console_thread(
                 if *client_state.lock().unwrap() == ClientState::Gaming {
                     let str = line.trim_start_matches("出牌 ");
                     let cards = parse_input(str);
-                    if cards.is_none() {
-                        println!("你没有出任何牌！")
-                    } else {
+                    if let Some(cards) = cards {
                         let data = bincode::serialize(&C2SMessage::SubmitCards(cards.unwrap())).unwrap();
                         handler.network().send(server_id, &data);
+                    } else {
+                        println!("你没有出任何牌！")
                     }
                 } else {
                     println!("你现在还不能出牌！");

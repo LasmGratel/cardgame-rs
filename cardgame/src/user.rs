@@ -70,15 +70,15 @@ impl UserManager {
         }
     }
 
-    pub fn get_user(&self, id: &String) -> Option<User> {
+    pub fn get_user(&self, id: &str) -> Option<User> {
         if self.cache.contains_key(id) {
-            self.cache.get(id).map(|x| x.clone())
+            self.cache.get(id).cloned()
         } else {
             let user = self.read_user(id);
             if let Ok(user) = user { // 存在这个文件
                 Some(user)
             } else {
-                Some(User::new(id.clone()))
+                Some(User::new(id.to_string()))
             }
         }
     }

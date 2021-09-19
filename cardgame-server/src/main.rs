@@ -57,17 +57,17 @@ pub fn main() {
                         let get_user_id = || -> Option<&UserId> {
                             client_map.get_by_right(&endpoint)
                         };
-                        let send_to_client = |msg: &S2CMessage| -> () {
+                        let send_to_client = |msg: &S2CMessage| {
                             let to_send = bincode::serialize(msg).unwrap();
                             network.send(endpoint, &to_send);
                         };
-                        let send_to_user = |user: &UserId, msg: &S2CMessage| -> () {
+                        let send_to_user = |user: &UserId, msg: &S2CMessage| {
                             let to_send = bincode::serialize(msg).unwrap();
                             let user_endpoint = client_map.get_by_left(user).unwrap();
-                            network.send(user_endpoint.clone(), &to_send);
+                            network.send(*user_endpoint, &to_send);
                         };
 
-                        let message: C2SMessage = bincode::deserialize(&data).unwrap();
+                        let message: C2SMessage = bincode::deserialize(data).unwrap();
                         match message {
                             C2SMessage::Ping => {
                                 println!("客户端 Ping")
@@ -76,7 +76,7 @@ pub fn main() {
                                 println!("玩家 {} 登入", username);
                                 send_to_client(&S2CMessage::LoggedIn);
 
-                                client_map.insert(username.clone(), endpoint.clone());
+                                client_map.insert(username.clone(), endpoint);
 
                                 let user = client_map.get_by_right(&endpoint).map(|x| user_manager.get_user(x).unwrap()).unwrap();
                                 match user_states.get(&username) {
@@ -86,14 +86,14 @@ pub fn main() {
                                     Some(state) => {
                                         match state {
                                             UserState::Idle => {
-                                                lobby.login(user.id.clone());
+                                                lobby.login(user.id);
                                             }
                                             UserState::Matchmaking => {
                                                 // 断线后取消匹配
                                                 user_states.insert(user.id.clone(), UserState::Idle);
-                                                lobby.login(user.id.clone());
+                                                lobby.login(user.id);
                                             }
-                                            UserState::Playing(room) => {
+                                            UserState::Playing(_room) => {
                                                 // TODO 断线重连
                                             }
                                         }
@@ -331,7 +331,7 @@ pub fn main() {
                     let send_to_user = |user: &UserId, msg: &S2CMessage| -> () {
                         let to_send = bincode::serialize(msg).unwrap();
                         let user_endpoint = client_map.get_by_left(user).unwrap();
-                        network.send(user_endpoint.clone(), &to_send);
+                        network.send(*user_endpoint, &to_send);
                     };
 
                     if lobby.waiting_list.len() == 0 {
@@ -385,7 +385,7 @@ pub fn main() {
 
                             let to_send = bincode::serialize(msg).unwrap();
                             let user_endpoint = client_map.get_by_left(user).unwrap();
-                            network.send(user_endpoint.clone(), &to_send);
+                            network.send(*user_endpoint, &to_send);
                         }
 
                     }
