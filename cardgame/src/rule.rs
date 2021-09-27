@@ -173,7 +173,7 @@ impl RuleThreeWithTwo {
 impl Rule for RuleThreeWithTwo {
     fn matches(&self, cards: &[Card]) -> bool {
         let rule = RuleThreeWithTwo::try_new(cards);
-        return rule.is_some() && rule.unwrap().first > self.first;
+        rule.is_some() && rule.unwrap().first > self.first
     }
     fn to_string(&self) -> &str {
         "三带二"

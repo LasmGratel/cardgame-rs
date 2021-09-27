@@ -70,7 +70,7 @@ pub fn main() {
                         let message: C2SMessage = bincode::deserialize(data).unwrap();
                         match message {
                             C2SMessage::Ping => {
-                                println!("客户端 Ping")
+                                send_to_client(&S2CMessage::Pong);
                             }
                             C2SMessage::Login(username) => {
                                 println!("玩家 {} 登入", username);
@@ -312,7 +312,7 @@ pub fn main() {
                         }
                     }
                     NetEvent::Disconnected(endpoint) => {
-                        println!("{} Disconnected", endpoint);
+                        println!("{} 已断开", endpoint);
                         if let Some(user) = client_map.get_by_right(&endpoint).map(|x| user_manager.get_user(x).unwrap()) {
                             lobby.disconnect(&user.id);
                             user_states.remove(&user.id);

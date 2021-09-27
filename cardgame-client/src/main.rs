@@ -9,7 +9,11 @@ use message_io::node::*;
 use std::sync::mpsc::*;
 use std::thread::JoinHandle;
 use std::sync::{Mutex, Arc};
+use std::time::{SystemTime};
+use std::process::exit;
 
+// 共享状态
+type SharedStates = (Arc<Mutex<String>>, Arc<Mutex<ClientState>>, Arc<Mutex<Vec<Card>>>, Arc<Mutex<String>>, Arc<Mutex<SystemTime>>);
 
 /// 客户端状态
 #[derive(Eq, PartialEq, Clone)]
@@ -33,15 +37,17 @@ enum ClientState {
     Gaming,
 }
 
+
+
 fn run_network_thread(
     _server_id: Endpoint,
     handler: NodeHandler<Signal>,
     listener: NodeListener<Signal>,
     sender: Sender<S2CMessage>,
-    mutexs: (Arc<Mutex<String>>, Arc<Mutex<ClientState>>, Arc<Mutex<Vec<Card>>>, Arc<Mutex<String>>)
+    mutexs: SharedStates
 ) -> JoinHandle<()> {
     std::thread::spawn(move || {
-        let (user_name, client_state, cards_mutex, landlord_name) = mutexs;
+        let (user_name, client_state, cards_mutex, landlord_name, last_packet_time) = mutexs;
         listener.for_each(move |event| match event {
             NodeEvent::Signal(signal) => match signal {
                 cardgame::Signal::Greet => {
@@ -59,6 +65,13 @@ fn run_network_thread(
                 NetEvent::Message(_, input_data) => {
                     let message: S2CMessage = bincode::deserialize(input_data).unwrap();
                     match message {
+                        S2CMessage::Pong => {
+                            let recv_time = SystemTime::now();
+                            let send_time = *last_packet_time.lock().unwrap();
+
+                            let duration = recv_time.duration_since(send_time).expect("Time went backwards");
+                            println!("砰！延迟为 {}", humantime::format_duration(duration));
+                        }
                         S2CMessage::RoomJoined(room) => {
                             let mut state = client_state.lock().unwrap();
                             println!("加入房间：{}", room);
@@ -180,8 +193,9 @@ fn run_network_thread(
                 }
                 NetEvent::Connected(_, _) => unreachable!(), // Only generated when a listener accepts
                 NetEvent::Disconnected(_) => {
-                    println!("Server is disconnected");
+                    println!("服务器断开，程序关闭。");
                     handler.stop();
+                    exit(0);
                 },
             },
         });
@@ -207,12 +221,12 @@ fn run_console_thread(
     server_id: Endpoint,
     handler: NodeHandler<Signal>,
     rx: Receiver<S2CMessage>,
-    mutexs: (Arc<Mutex<String>>, Arc<Mutex<ClientState>>, Arc<Mutex<Vec<Card>>>, Arc<Mutex<String>>)
+    mutexs: SharedStates
 ) -> JoinHandle<()> {
     std::thread::spawn(move || {
-        let (user_name, client_state, cards_mutex, landlord_name) = mutexs;
+        let (user_name, client_state, cards_mutex, landlord_name, last_packet_time) = mutexs;
 
-        let send_to_server = |msg: &C2SMessage| -> () {
+        let send_to_server = |msg: &C2SMessage| {
             let data = bincode::serialize(msg).unwrap();
             handler.network().send(server_id, &data);
         };
@@ -258,7 +272,7 @@ fn run_console_thread(
                     let str = line.trim_start_matches("出牌 ");
                     let cards = parse_input(str);
                     if let Some(cards) = cards {
-                        let data = bincode::serialize(&C2SMessage::SubmitCards(cards.unwrap())).unwrap();
+                        let data = bincode::serialize(&C2SMessage::SubmitCards(cards)).unwrap();
                         handler.network().send(server_id, &data);
                     } else {
                         println!("你没有出任何牌！")
@@ -321,6 +335,10 @@ fn run_console_thread(
                                 println!("游戏已开始或无法开始！")
                             }
                         }
+                    }
+                    "延迟" => {
+                        *last_packet_time.lock().unwrap() = SystemTime::now();
+                        send_to_server(&C2SMessage::Ping);
                     }
                     "pass" => {
                         if *client_state.lock().unwrap() == ClientState::Gaming {
@@ -427,7 +445,7 @@ fn run() {
 
 fn main() {
     let transport = Transport::FramedTcp;
-    let remote_addr = "1.117.73.154:3042".to_remote_addr().unwrap();
+    let remote_addr = "127.0.0.1:3042".to_remote_addr().unwrap();
     let (handler, listener) = node::split();
 
     let server_id = match handler.network().connect(transport, remote_addr.clone()) {
@@ -450,8 +468,9 @@ fn main() {
     let client_state = Arc::new(Mutex::new(ClientState::NotLoggedIn));
     let cards = Arc::new(Mutex::new(vec![]));
     let landlord_name = Arc::new(Mutex::new(String::new()));
+    let last_packet_time = Arc::new(Mutex::new(SystemTime::now()));
 
-    let mutexs = (user_name, client_state, cards, landlord_name);
+    let mutexs = (user_name, client_state, cards, landlord_name, last_packet_time);
 
     handler.signals().send(crate::Signal::Greet);
 

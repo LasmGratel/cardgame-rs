@@ -23,6 +23,13 @@ mod tests {
             assert!(rule.matches(&parse_input("2").unwrap()));
             assert!(!rule.matches(&parse_input("3").unwrap()));
         }
+
+        #[test]
+        fn two() {
+            let rule = rule_from_str("44");
+            assert!(rule.matches(&parse_input("22").unwrap()));
+            assert!(!rule.matches(&parse_input("33").unwrap()));
+        }
     }
 
     /// 测试不符合规则的乱敲

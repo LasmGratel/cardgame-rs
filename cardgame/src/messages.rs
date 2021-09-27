@@ -5,6 +5,9 @@ use std::time::Duration;
 
 #[derive(Serialize, Deserialize)]
 pub enum S2CMessage {
+    /// 返回延迟
+    Pong,
+
     /// 更新用户数据
     UpdateData(User),
 
