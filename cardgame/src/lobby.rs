@@ -2,6 +2,8 @@ use crate::user::UserId;
 use crate::{Game, Player};
 use serde::{Serialize, Deserialize};
 use std::slice::Iter;
+use std::error::Error;
+use std::fmt::{Debug, Formatter, Display};
 
 pub struct Room {
     pub name: String,
@@ -43,7 +45,7 @@ impl Room {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum RoomError {
     /// 未准备好（人数不足）
     NotReady,
@@ -54,6 +56,40 @@ pub enum RoomError {
     /// 不是当前正在选择是否叫地主的玩家
     NotLandlordPlayer
 }
+
+impl Debug for RoomError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            RoomError::NotReady => {
+                write!(f, "RoomError::NotReady")
+            }
+            RoomError::NotStarted => {
+                write!(f, "RoomError::NotStarted")
+            }
+            RoomError::NotLandlordPlayer => {
+                write!(f, "RoomError::NotLandlordPlayer")
+            }
+        }
+    }
+}
+
+impl Display for RoomError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match *self {
+            RoomError::NotReady => {
+                write!(f, "房间未准备好")
+            }
+            RoomError::NotStarted => {
+                write!(f, "游戏尚未开始")
+            }
+            RoomError::NotLandlordPlayer => {
+                write!(f, "不是你叫地主")
+            }
+        }
+    }
+}
+
+impl Error for RoomError {}
 
 /// 游戏大厅，用于加入房间和匹配玩家。
 pub trait Lobby {
@@ -71,4 +107,7 @@ pub enum LobbyError {
 
     /// 房间已满
     RoomFull,
+
+    RoomErr(RoomError),
+    OtherError
 }
