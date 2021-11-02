@@ -39,7 +39,7 @@ pub struct Game {
     pub last_cards: Vec<Card>,
 
     /// 最后出牌所匹配的规则
-    pub last_rule: Box<dyn Rule>,
+    pub last_rule: Box<dyn Rule + Send + Sync + 'static>,
 
     /// 地主牌
     pub landlord_cards: Vec<Card>,
@@ -262,7 +262,7 @@ impl Default for Game {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub enum GameError {
     NotRunning, NotYourTurn, NoSuchCards, WrongRule, NoRule,
 

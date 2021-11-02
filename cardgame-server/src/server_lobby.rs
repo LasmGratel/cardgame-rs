@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use message_io::network::{NetworkController, Endpoint, SendStatus};
 
 use cardgame::user::{UserId, UserState};
-use cardgame::{Game, Lobby, LobbyError, Room, RoomState, S2CMessage, RoomError, GameState};
+use cardgame::{Game, Lobby, LobbyError, Room, RoomState, S2CMessage, RoomError, GameState, Card, GameError};
 use bimap::{BiMap, BiHashMap};
 use anyhow::Error;
 use crate::server_network::{NetworkManager, MessagePacket, MessageTarget};
@@ -138,22 +138,14 @@ impl ServerLobby<'_> {
         Ok(room)
     }
 
-    pub fn rematch_vote(&mut self, user: &str, vote: bool) -> Result<MessagePacket, RoomError> {
-        if let Some(room) = self.get_room_by_user_mut(user) {
+    pub fn rematch_vote(&self, user: &str, vote: bool) -> Result<(u32, bool), RoomError> {
+        if let Some(room) = self.get_room_by_user(user) {
             let current_state = room.state.clone();
             if let RoomState::WaitingForRematch(count) = current_state {
                 return if vote {
-                    if count + 1 == 3 {
-                        room.game.reset();
-
-                        self.start_game(room);
-                    }
-                    room.state = RoomState::WaitingForRematch(count + 1);
-                    Ok((MessageTarget::Reply, S2CMessage::RematchVote(user.to_string(), vote, count + 1)))
+                    Ok((count + 1, vote))
                 } else {
-                    let name = room.name.clone();
-                    *room = Room::new(name);
-                    Ok((MessageTarget::Reply, S2CMessage::RematchVote(user.to_string(), vote, count)))
+                    Ok((count, vote))
                 }
             }
         }
@@ -180,9 +172,20 @@ impl ServerLobby<'_> {
         }
     }
 
+    pub fn submit_cards(&mut self, endpoint: &Endpoint, cards: Vec<Card>) -> Result<String, GameError> {
+        let user_id = self.network.user_map.get_by_right(endpoint).unwrap().to_string();
+        let room = self.get_room_by_endpoint_mut(endpoint).unwrap();
+        return if room.game.state != GameState::Running {
+            Err(GameError::NotRunning)
+        } else if room.game.current_player().user != user_id {
+            Err(GameError::NotYourTurn)
+        } else {
+            room.game.submit_cards(cards)
+        }
+    }
+
     pub fn choose_landlord_by_endpoint(&mut self, endpoint: &Endpoint, choose: bool) -> Result<MessagePacket, Error> {
         let user = self.get_user(endpoint).expect("No user found by endpoint").clone();
-        let network = &self.network;
         if let Some(room) = self.get_room_by_user_mut(&user) {
             // 尚未开始叫地主阶段
             if room.game.state != GameState::WaitingForLandlord {
@@ -259,8 +262,12 @@ impl Lobby for ServerLobby<'_> {
     }
 
     fn disconnect(&mut self, user: &str) {
+        if let Some(UserState::Playing(game_name)) = self.user_states.get(user) {
+            self.rooms.remove(game_name);
+        }
         if let Some(pos) = self.users.iter().position(|x| x == user) {
             self.users.remove(pos);
+            self.network.user_map.remove_by_left(user);
         }
     }
 }

@@ -416,7 +416,7 @@ impl Rule for RuleAirplaneWithTwoWings {
     }
 }
 
-pub fn match_rule(cards: &[Card]) -> Box<dyn Rule> {
+pub fn match_rule(cards: &[Card]) -> Box<dyn Rule + Send + Sync + 'static> {
     match cards.len() {
         1 => {
             let option = RuleOne::try_new(cards);

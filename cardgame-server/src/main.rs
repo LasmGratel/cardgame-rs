@@ -37,7 +37,7 @@ pub fn main() {
 
         println!("服务器在 {} 上监听", address);
 
-        let lobby = Rc::new(Mutex::new(ServerLobby::new(network)));
+        let mut lobby = ServerLobby::new(network);
         let mut clients: Vec<Endpoint> = vec![];
         let mut client_map: BiHashMap<String, Endpoint> = BiHashMap::new();
         let mut user_manager = UserManager::new(String::from("users"));
@@ -71,10 +71,10 @@ pub fn main() {
                         let send_packet = |packet: MessagePacket| {
                             match packet.0 {
                                 MessageTarget::Reply => {
-                                    lobby.lock().unwrap().send_packet((MessageTarget::Endpoint(endpoint), packet.1));
+                                    lobby.send_packet((MessageTarget::Endpoint(endpoint), packet.1));
                                 }
                                 _ => {
-                                    lobby.lock().unwrap().send_packet(packet);
+                                    lobby.send_packet(packet);
                                 }
                             }
                         };
@@ -85,6 +85,7 @@ pub fn main() {
                         };
 
                         let message: C2SMessage = bincode::deserialize(data).unwrap();
+
                         match message {
                             C2SMessage::Ping => {
                                 send_to_client(&S2CMessage::Pong);
@@ -92,18 +93,28 @@ pub fn main() {
                             C2SMessage::Login(username) => {
                                 println!("玩家 {} 登入", username);
                                 send_to_client(&S2CMessage::LoggedIn);
-                                lobby.lock().unwrap().connect(username, endpoint);
+                                lobby.connect(username, endpoint);
                             }
                             // 加入房间
                             C2SMessage::JoinRoom(room_name) => {
-                                lobby.lock().unwrap().join_room_by_endpoint(&room_name, endpoint);
+                                match lobby.join_room_by_endpoint(&room_name, endpoint) {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        send_to_client(&S2CMessage::LobbyErr(e))
+                                    }
+                                }
                             }
                             C2SMessage::StartGame(room_name) => {
-                                lobby.lock().unwrap().start_game_by_name(&room_name);
+                                match lobby.start_game_by_name(&room_name) {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        send_to_client(&S2CMessage::RoomErr(e))
+                                    }
+                                }
                             }
                             C2SMessage::ChooseLandlord(choose) => {
                                 let room = if let Some(UserState::Playing(room_name)) = user_states.get(client_map.get_by_right(&endpoint).unwrap()) {
-                                    lobby.lock().unwrap().rooms.get_mut(room_name)
+                                    lobby.rooms.get_mut(room_name)
                                 } else {
                                     None
                                 };
@@ -137,7 +148,7 @@ pub fn main() {
                             }
                             C2SMessage::Pass => {
                                 let room = if let Some(UserState::Playing(room_name)) = user_states.get(client_map.get_by_right(&endpoint).unwrap()) {
-                                    lobby.lock().unwrap().rooms.get_mut(room_name)
+                                    lobby.rooms.get_mut(room_name)
                                 } else {
                                     None
                                 };
@@ -165,18 +176,35 @@ pub fn main() {
                             }
                             C2SMessage::RematchVote(rematch) => {
                                 let user_id = client_map.get_by_right(&endpoint).unwrap();
-                                match lobby.lock().unwrap().rematch_vote(user_id, rematch) {
-                                    Ok(packet) => {
-
+                                match lobby.rematch_vote(user_id, rematch) {
+                                    Ok((count, vote)) => {
+                                        send_packet((MessageTarget::Reply, S2CMessage::RematchVote(user_id.to_string(), vote, count)));
+                                        let room = lobby.get_room_by_user_mut(user_id).unwrap();
+                                        if count == 3 {
+                                            room.game.reset();
+                                        } else {
+                                            room.state = RoomState::WaitingForRematch(count);
+                                        }
                                     }
                                     Err(err) => {
-
                                     }
                                 }
                             }
                             C2SMessage::SubmitCards(cards) => {
+                                match lobby.submit_cards(&endpoint, cards.clone()) {
+                                    Ok(next_player) => {
+                                        let room = lobby.get_room_by_endpoint(&endpoint).unwrap();
+                                        for user in room.users.iter() {
+                                            send_to_user(user, &S2CMessage::CardsSubmitted(client_map.get_by_right(&endpoint).unwrap().clone(), cards.clone()));
+                                            send_to_user(user, &S2CMessage::Move(next_player.clone()));
+                                        }
+                                    }
+                                    Err(e) => {
+                                        send_to_client(&S2CMessage::GameErr(e));
+                                    }
+                                }
                                 let room = if let Some(UserState::Playing(room_name)) = user_states.get(client_map.get_by_right(&endpoint).unwrap()) {
-                                    lobby.lock().unwrap().rooms.get_mut(room_name)
+                                    lobby.rooms.get_mut(room_name)
                                 } else {
                                     None
                                 };
@@ -215,12 +243,12 @@ pub fn main() {
                             C2SMessage::Matchmake => {
                                 let user_id = get_user_id().unwrap();
                                 matchmake_timer = 120; // 重设等待玩家倒计时
-                                lobby.lock().unwrap().waiting_list.push(user_id.clone());
+                                lobby.waiting_list.push(user_id.clone());
                                 user_states.insert(user_id.clone(), UserState::Matchmaking);
                                 signals.send(Signal::Matchmake);
                             }
                             C2SMessage::QueryRoomList => {
-                                let data = lobby.lock().unwrap().rooms.keys().map(|x| x.to_string()).collect();
+                                let data = lobby.rooms.keys().map(|x| x.to_string()).collect();
                                 send_to_client(&S2CMessage::RoomList(data));
                             }
                             _ => {
@@ -231,7 +259,7 @@ pub fn main() {
                     NetEvent::Disconnected(endpoint) => {
                         println!("{} 已断开", endpoint);
                         if let Some(user) = client_map.get_by_right(&endpoint).map(|x| user_manager.get_user(x).unwrap()) {
-                            lobby.lock().unwrap().disconnect(&user.id);
+                            lobby.disconnect(&user.id);
                             user_states.remove(&user.id);
                         }
                         let client = clients
@@ -250,26 +278,26 @@ pub fn main() {
                     network.send(*user_endpoint, &to_send);
                 };
 
-                if lobby.lock().unwrap().waiting_list.len() == 0 {
+                if lobby.waiting_list.len() == 0 {
                     // 没有人在等待队列，停止匹配
                     matchmake_timer = 0;
                 } else if matchmake_timer > 0 {
                     matchmake_timer -= 1;
                     signals.send_with_timer(Signal::Matchmake, Duration::from_secs(1));
 
-                    if lobby.lock().unwrap().waiting_list.len() >= 3 {
-                        lobby.lock().unwrap().waiting_list.shuffle(&mut rng);
+                    if lobby.waiting_list.len() >= 3 {
+                        lobby.waiting_list.shuffle(&mut rng);
 
-                        for i in 0..(lobby.lock().unwrap().waiting_list.len() / 3) {
+                        for i in 0..(lobby.waiting_list.len() / 3) {
                             matchmake_id += 1;
                             let room_name = format!("Matchmake Room #{}", matchmake_id);
                             for j in 0..3 {
-                                let user = lobby.lock().unwrap().waiting_list.get(j).unwrap().clone();
+                                let user = lobby.waiting_list.get(j).unwrap().clone();
 
-                                let result = lobby.lock().unwrap().join_room(&room_name, user.clone());
+                                let result = lobby.join_room(&room_name, user.clone());
                                 match result {
                                     Ok(packet) => {
-                                        lobby.lock().unwrap().send_packet(packet);
+                                        lobby.send_packet(packet);
                                     }
                                     Err(err) => {
                                         // send_to_client(&S2CMessage::LobbyErr(err));
@@ -277,15 +305,15 @@ pub fn main() {
                                 }
                             }
                             for _ in 0..3 {
-                                lobby.lock().unwrap().waiting_list.remove(0);
+                                lobby.waiting_list.remove(0);
                             }
 
-                            lobby.lock().unwrap().start_game_by_name(&room_name);
+                            lobby.start_game_by_name(&room_name);
                         }
                     }
 
-                    for user in lobby.lock().unwrap().waiting_list.iter() {
-                        let msg = &S2CMessage::MatchmakeStatus(lobby.lock().unwrap().waiting_list.len() as u32, Duration::from_secs(120), Duration::from_secs(matchmake_timer));
+                    for user in lobby.waiting_list.iter() {
+                        let msg = &S2CMessage::MatchmakeStatus(lobby.waiting_list.len() as u32, Duration::from_secs(120), Duration::from_secs(matchmake_timer));
 
                         let to_send = bincode::serialize(msg).unwrap();
                         let user_endpoint = client_map.get_by_left(user).unwrap();

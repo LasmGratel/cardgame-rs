@@ -45,7 +45,7 @@ impl Room {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub enum RoomError {
     /// 未准备好（人数不足）
     NotReady,
@@ -100,7 +100,7 @@ pub trait Lobby {
     fn disconnect(&mut self, user: &str);
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq)]
 pub enum LobbyError {
     /// 已经加入房间
     HasJoinedRoom,

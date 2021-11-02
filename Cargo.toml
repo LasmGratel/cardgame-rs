@@ -3,5 +3,8 @@
 members = [
     "cardgame",
     "cardgame-client",
-    "cardgame-server"
+    "cardgame-server",
+    "cardgame-common",
+    "cardgame-bevy-client",
+    "cardgame-bevy-server"
 ]

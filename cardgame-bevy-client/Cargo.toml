@@ -1,0 +1,16 @@
+[package]
+name = "cardgame-bevy-client"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+cardgame = {path = "../cardgame"}
+cardgame-common = {path = "../cardgame-common"}
+bevy = "0.5"
+bevy_spicy_networking = "0.6"
+uuid = {version = "0.8", features = ["serde", "v4"]}
+humantime = "2.1.0"
+timeago = "0.3.0"
+anyhow = "1.0"

@@ -18,6 +18,7 @@ pub fn send_to_endpoint(controller: &NetworkController, message: &S2CMessage, en
     Some(controller.send(endpoint, &to_send))
 }
 
+#[derive(Clone)]
 pub struct NetworkManager<'a> {
     pub user_map: BiMap<UserId, Endpoint>,
 
