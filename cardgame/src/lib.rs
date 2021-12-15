@@ -10,7 +10,9 @@ mod tests {
     use crate::{parse_input, match_rule};
 
     mod rules {
-        use crate::{match_rule, parse_input, Rule};
+        use std::time::Instant;
+        use crate::{Card, CardStore, gen_cards, match_rule, parse_input, Rule};
+        use crate::Card::{CardGhost, CardKing, CardQ};
 
         fn rule_from_str(input: &str) -> Box<dyn Rule> {
             match_rule(&parse_input(input).unwrap())
@@ -29,6 +31,50 @@ mod tests {
             let rule = rule_from_str("44");
             assert!(rule.matches(&parse_input("22").unwrap()));
             assert!(!rule.matches(&parse_input("33").unwrap()));
+        }
+
+        #[test]
+        fn test_gen_card() {
+            let mut cards = CardStore::default();
+            let start = Instant::now();
+
+            cards.raw = 1 << 52 - 1;
+            cards.add(&CardKing);
+            cards.add(&CardGhost);
+            let duration = start.elapsed();
+
+            println!("Time elapsed in expensive_function() is: {:?}", duration);
+            let mut cards = CardStore::default();
+            let start = Instant::now();
+            let cards = gen_cards();
+            let duration = start.elapsed();
+            println!("Time elapsed in expensive_function() is: {:?}", duration);
+        }
+
+        #[test]
+        fn test_card_store() {
+            let mut cards = CardStore::default();
+            let mut generated = gen_cards();
+            generated.sort();
+            for card in generated.iter() {
+                cards.add(card);
+            }
+            assert!(cards.get_cards().eq(&generated));
+        }
+
+        #[test]
+        fn offset() {
+            let mut cards = CardStore::default();
+            cards.raw = 17i64;
+            for i in 0..16 {
+                let card = Card::from_value(i);
+                cards.add(&card);
+                let count = cards.get_card_count(&card);
+            }
+
+            println!("{:#064b}", cards.raw);
+            println!("{:?}", cards.get_cards());
+
         }
     }
 
@@ -53,6 +99,7 @@ pub mod messages;
 pub mod player;
 pub mod rule;
 pub mod user;
+pub mod error;
 
 pub use card::*;
 pub use game::*;

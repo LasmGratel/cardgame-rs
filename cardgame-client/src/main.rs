@@ -8,9 +8,10 @@ use message_io::node;
 use message_io::node::*;
 use std::sync::mpsc::*;
 use std::thread::JoinHandle;
-use std::sync::{Mutex, Arc};
-use std::time::{SystemTime};
+use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 use std::process::exit;
+use cardgame::error::{GameError, RoomError};
 
 // 共享状态
 type SharedStates = (Arc<Mutex<String>>, Arc<Mutex<ClientState>>, Arc<Mutex<Vec<Card>>>, Arc<Mutex<String>>, Arc<Mutex<SystemTime>>);

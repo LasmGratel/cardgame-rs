@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
-use message_io::network::{NetworkController, Endpoint, SendStatus};
+use message_io::network::{Endpoint, NetworkController, SendStatus};
 
 use cardgame::user::{UserId, UserState};
-use cardgame::{Game, Lobby, LobbyError, Room, RoomState, S2CMessage, RoomError, GameState, Card, GameError};
-use bimap::{BiMap, BiHashMap};
+use cardgame::{Card, Game, GameState, Lobby, Room, RoomState, S2CMessage};
+use bimap::{BiHashMap, BiMap};
 use anyhow::Error;
-use crate::server_network::{NetworkManager, MessagePacket, MessageTarget};
+use cardgame::error::{GameError, LobbyError, RoomError};
+use crate::server_network::{MessagePacket, MessageTarget, NetworkManager};
 
 /// 大厅的服务器实现。
 pub struct ServerLobby<'a> {

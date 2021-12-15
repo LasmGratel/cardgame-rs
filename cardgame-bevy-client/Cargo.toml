@@ -8,9 +8,10 @@ edition = "2018"
 [dependencies]
 cardgame = {path = "../cardgame"}
 cardgame-common = {path = "../cardgame-common"}
-bevy = "0.5"
+bevy = { version = "0.5", default-features = false, features = ["bevy_dylib", "bevy_dynamic_plugin"] }
 bevy_spicy_networking = "0.6"
 uuid = {version = "0.8", features = ["serde", "v4"]}
 humantime = "2.1.0"
 timeago = "0.3.0"
 anyhow = "1.0"
+crossbeam = "0.8"

@@ -1,15 +1,18 @@
-use cardgame::{Card, LobbyError, RoomError, GameError};
+use cardgame::Card;
 use serde::{Deserialize, Serialize};
 use cardgame::user::{User, UserId};
 use std::time::Duration;
-use bevy_spicy_networking::{ServerMessage, NetworkMessage, ClientMessage};
+use bevy_spicy_networking::{ClientMessage, NetworkMessage, ServerMessage};
+use cardgame::error::{GameError, LobbyError, RoomError};
 
-#[derive(Serialize, Deserialize, PartialEq)]
+#[derive(Serialize, Deserialize, PartialEq, Clone)]
 pub enum S2CMessage {
     /// 返回延迟
     Pong,
 
     Pong2,
+
+    Chat(String),
 
     /// 更新用户数据
     UpdateData(User),

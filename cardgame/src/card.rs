@@ -2,8 +2,9 @@ use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::{FromPrimitive, ToPrimitive};
 use serde::{Deserialize, Serialize};
 use std::cmp::{Ord, Ordering, PartialEq, PartialOrd};
+use std::slice::Iter;
 
-#[derive(Eq, Copy, Clone, FromPrimitive, ToPrimitive, Serialize, Deserialize)]
+#[derive(Eq, Copy, Clone, FromPrimitive, ToPrimitive, Serialize, Deserialize, Debug)]
 pub enum Card {
     Unknown,
     Card3,
@@ -21,6 +22,12 @@ pub enum Card {
     Card2,
     CardGhost,
     CardKing,
+}
+
+impl Default for Card {
+    fn default() -> Self {
+        Card::Unknown
+    }
 }
 
 impl Ord for Card {
@@ -93,7 +100,7 @@ impl Card {
     }
 }
 
-#[derive(Eq, Clone)]
+#[derive(Eq, Clone, Default, Copy)]
 pub struct CardGroup {
     pub card: Card,
     pub count: u32,
@@ -199,4 +206,78 @@ pub fn to_card_groups(vec: &[Card]) -> CardGroups {
     }
     groups.groups.sort();
     groups
+}
+
+/// Compact card storage
+/// A deck has only 54 cards so 63 bits are more than adequate
+#[derive(Default, Debug)]
+pub struct CardStore {
+    pub raw: i64
+}
+
+impl CardStore {
+    pub fn get_card_count(&self, card: &Card) -> i64 {
+        let mask = 15;
+        let offset: i64 = ((card.value() - 1) * 4) as i64;
+        (self.raw >> offset) & mask
+    }
+
+    pub fn add(&mut self, card: &Card) {
+        let offset: i64 = ((card.value() - 1) * 4) as i64;
+        let count = self.get_card_count(card) + 1;
+        self.raw &= !(15i64 << offset);
+        self.raw |= count << offset;
+    }
+
+    pub fn get_cards(&self) -> Vec<Card> {
+        let mut vec = vec![];
+        let mask = 15;
+        for i in 0..15i64 {
+            let count = ((self.raw & (mask << i * 4i64)) >> i * 4i64) & mask;
+            for j in 0..count {
+                vec.push(Card::from_value(i as u32 + 1));
+            }
+        }
+        vec
+    }
+
+    pub fn get_card_groups_arr(&self) -> [CardGroup; 16] {
+        let mut arr: [CardGroup; 16] = [CardGroup::default(); 16];
+        let mask = 15;
+        for i in 0..15i64 {
+            let count = ((self.raw & (mask << i * 4i64)) >> i * 4i64) & mask;
+            arr[i as usize] = CardGroup { card: Card::from_value(i as u32 + 1), count: count as u32 };
+        }
+        arr
+    }
+
+    pub fn get_card_groups(&self) -> Vec<CardGroup> {
+        let mut vec = vec![];
+        let mask = 15;
+        for i in 0..15i64 {
+            let count = ((self.raw & (mask << i * 4i64)) >> i * 4i64) & mask;
+            vec.push(CardGroup { card: Card::from_value(i as u32 + 1), count: count as u32 })
+        }
+        vec
+    }
+
+    pub fn iter(&self) -> CardStoreIter {
+        CardStoreIter {
+            store: self,
+            curr: 0
+        }
+    }
+}
+
+pub struct CardStoreIter<'a> {
+    store: &'a CardStore,
+    curr: i32,
+}
+
+impl<'a> Iterator for CardStoreIter<'a> {
+    type Item = Card;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        None
+    }
 }

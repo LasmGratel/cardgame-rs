@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::user::UserId;
 
 /// 玩家类型
-#[derive(PartialEq, Serialize, Deserialize, Clone)]
+#[derive(PartialEq, Serialize, Deserialize, Clone, Debug)]
 pub enum PlayerType {
     /// 农民
     Farmer,

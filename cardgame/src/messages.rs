@@ -1,9 +1,10 @@
-use crate::{Card, LobbyError, RoomError, GameError};
+use crate::Card;
 use serde::{Deserialize, Serialize};
 use crate::user::{User, UserId};
 use std::time::Duration;
+use crate::error::{GameError, LobbyError, RoomError};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub enum S2CMessage {
     /// 返回延迟
     Pong,

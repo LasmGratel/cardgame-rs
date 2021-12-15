@@ -2,13 +2,14 @@ use bimap::BiHashMap;
 use cardgame::*;
 use message_io::network::*;
 use message_io::node;
-use cardgame::user::{UserManager, UserState, User, UserId};
+use cardgame::user::{User, UserId, UserManager, UserState};
 use std::collections::HashMap;
 use crate::server_lobby::ServerLobby;
 use message_io::node::NodeEvent;
 use std::time::Duration;
 use std::sync::Mutex;
 use std::rc::Rc;
+use cardgame::error::{GameError, RoomError};
 use crate::server_network::{MessagePacket, MessageTarget};
 
 /// 大厅

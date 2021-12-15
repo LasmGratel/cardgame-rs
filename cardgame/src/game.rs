@@ -5,8 +5,9 @@ use rand::prelude::SliceRandom;
 use rand::thread_rng;
 use rand::Rng;
 use regex::Regex;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::slice::Iter;
+use crate::error::GameError;
 use crate::user::UserId;
 
 /// 基础积分
@@ -128,14 +129,15 @@ impl Game {
         self.landlord_index = 0;
         self.landlord_cards.clear();
         self.score_multiplier = 1;
+        self.state = GameState::WaitingForLandlord;
     }
 
-    pub fn start(&mut self) -> Result<(&Player, Iter<Player>), &str> {
+    pub fn start(&mut self) -> Result<(&Player, Iter<Player>), GameError> {
         if self.players.len() != 3 {
-            return Err("玩家数不够!");
+            return Err(GameError::NotEnoughPlayers);
         }
         if self.state != GameState::WaitingForPlayers {
-            return Err("游戏已经开始!");
+            return Err(GameError::IsRunning);
         }
 
         self.state = GameState::WaitingForLandlord;
@@ -229,12 +231,12 @@ impl Game {
         }
     }
 
-    pub fn run(&mut self) -> Result<(), &str> {
+    pub fn run(&mut self) -> Result<(), GameError> {
         if self.players.len() != 3 {
-            return Err("玩家数不够!");
+            return Err(GameError::NotEnoughPlayers);
         }
         if self.state != GameState::WaitingForLandlord {
-            return Err("游戏已经开始!");
+            return Err(GameError::NotReady);
         }
 
         // 发地主牌
@@ -262,20 +264,8 @@ impl Default for Game {
     }
 }
 
-#[derive(Serialize, Deserialize, Clone, PartialEq)]
-pub enum GameError {
-    NotRunning, NotYourTurn, NoSuchCards, WrongRule, NoRule,
-
-    /// 这把赢了
-    /// 参数：最后出掉牌的玩家，玩家类型，获得的积分
-    Win(UserId, PlayerType, u32),
-
-    /// 过你马呢
-    YourTurn
-}
-
 pub fn gen_cards() -> Vec<Card> {
-    let mut cards: Vec<Card> = vec![];
+    let mut cards: Vec<Card> = Vec::with_capacity(54);
     for i in 1..14 {
         for _ in 0..4 {
             cards.push(Card::from_value(i));
@@ -289,9 +279,11 @@ pub fn gen_cards() -> Vec<Card> {
 }
 
 pub fn parse_input(input: &str) -> Option<Vec<Card>> {
-    let input = input.to_ascii_uppercase().replace("10", "ß");
-    let input = input.replace("1", "0");
-    let input = input.replace("ß", "1");
+    let input = input
+        .to_ascii_uppercase()
+        .replace("10", "ß")
+        .replace("1", "0")
+        .replace("ß", "1");
     let cards_regex = Regex::new("([1-9jqkaJQKA]|鬼|王)+").unwrap();
     let result = cards_regex.find(input.as_str())?;
     let result = result.as_str().replace("10", "1");
