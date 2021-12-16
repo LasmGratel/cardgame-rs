@@ -15,3 +15,5 @@ humantime = "2.1.0"
 timeago = "0.3.0"
 anyhow = "1.0"
 crossbeam = "0.8"
+
+regex = "1"

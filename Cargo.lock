@@ -636,6 +636,7 @@ dependencies = [
  "cardgame-common",
  "crossbeam",
  "humantime",
+ "regex",
  "timeago",
  "uuid",
 ]

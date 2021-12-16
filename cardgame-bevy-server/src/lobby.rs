@@ -56,11 +56,11 @@ impl ServerLobby {
         }
     }
 
-    pub fn join_room_by_connection_id(&mut self, net: &NetworkServer, room_name: &str, connection_id: ConnectionId) -> Result<MessagePacket, LobbyError> {
+    pub fn join_room_by_connection_id(&mut self, net: &NetworkServer, room_name: &str, connection_id: ConnectionId) -> Result<(), LobbyError> {
         self.join_room(net, room_name, self.get_user(&connection_id).expect("User not found").to_string())
     }
 
-    pub fn join_room(&mut self, net: &NetworkServer, room_name: &str, user: UserId) -> Result<MessagePacket, LobbyError> {
+    pub fn join_room(&mut self, net: &NetworkServer, room_name: &str, user: UserId) -> Result<(), LobbyError> {
         if !self.rooms.contains_key(room_name) {
             self.rooms
                 .insert(room_name.to_string(), Room::new(room_name.to_string()));
@@ -72,7 +72,8 @@ impl ServerLobby {
         } else if room.users.len() == 3 {
             Err(LobbyError::RoomFull)
         } else {
-            room.push(user);
+            room.push(user.clone());
+            self.user_states.insert(user.to_string(), UserState::Playing(room_name.to_string()));
 
             if room.users.len() == 3 {
                 room.state = RoomState::Ready;
@@ -81,7 +82,6 @@ impl ServerLobby {
                     Ok((landlord_player, players)) => {
                         for player in players {
                             self.network.send_to_user(net, &player.user, S2CMessage::GameStarted(player.cards.clone(), landlord_player.user.clone()));
-                            self.user_states.insert(player.user.clone(), UserState::Playing(room_name.to_string()));
                         }
                     }
                     Err(err) => {
@@ -89,7 +89,8 @@ impl ServerLobby {
                     }
                 }
             }
-            Ok((MessageTarget::Reply, S2CMessage::RoomJoined(room_name.to_string())))
+            self.network.send_to_user(net, &user, S2CMessage::RoomJoined(room_name.to_string()));
+            Ok(())
         }
     }
 
@@ -103,7 +104,7 @@ impl ServerLobby {
                 }
             }
             Err(err) => {
-                self.send_to_room(net, &room.name, S2CMessage::RoomErr(err.clone()));
+                self.send_to_room_by_name(net, &room.name, S2CMessage::RoomErr(err.clone()));
                 return Err(Error::from(err));
             }
         }
@@ -167,7 +168,7 @@ impl ServerLobby {
                 self.network.send_to_user(net, &user, packet.1)
             }
             MessageTarget::Room(room) => {
-                self.send_to_room(net, &room, packet.1)
+                self.send_to_room_by_name(net, &room, packet.1)
             }
         }.map_err(|x| Error::from(x))
     }
@@ -241,12 +242,22 @@ impl ServerLobby {
         self.get_room_by_user_mut(&user)
     }
 
-    pub fn send_to_room(&self, net: &NetworkServer, room_name: &str, message: S2CMessage) -> Result<(), NetworkError> {
-        let room = self.get_room_by_user(room_name).expect("Cannot get room");
+    pub fn send_to_room(&self, net: &NetworkServer, room: &Room, message: S2CMessage) -> Result<(), NetworkError> {
         for user in room.users.iter() {
             self.network.send_to_user(net, &user, message.clone())?;
         }
         Ok(())
+    }
+
+    pub fn send_to_room_by_name(&self, net: &NetworkServer, room_name: &str, message: S2CMessage) -> Result<(), NetworkError> {
+        let room = self.get_room_by_user(room_name).expect("Cannot get room");
+        self.send_to_room(net, room, message)
+    }
+
+    pub fn disconnect_by_endpoint(&mut self, conn: &ConnectionId) {
+        if let Some(user) = self.network.user_map.get_by_right(conn).map(|x| x.clone()) {
+            self.disconnect(&user);
+        }
     }
 }
 

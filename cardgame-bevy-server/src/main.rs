@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use cardgame::{Game, GameState, Room, RoomState};
+use cardgame::{Game, GameState, Lobby, Room, RoomState};
 use cardgame_common::message::{C2SMessage, S2CMessage};
 use bevy::app::ScheduleRunnerSettings;
 use std::time::Duration;
@@ -52,6 +52,7 @@ fn submit_timer_system(time: Res<Time>, mut timer: ResMut<SubmitTimer>, query: Q
 fn handle_connection_events(
     mut commands: Commands,
     net: Res<NetworkServer>,
+    mut lobby: ResMut<ServerLobby>,
     mut network_events: EventReader<ServerNetworkEvent>,
 ) {
     for event in network_events.iter() {
@@ -61,6 +62,7 @@ fn handle_connection_events(
             }
             ServerNetworkEvent::Disconnected(connection_id) => {
                 println!("{} Disconnected", connection_id.address());
+                lobby.disconnect_by_endpoint(&connection_id);
             }
             ServerNetworkEvent::Error(err) => {
                 error!("{:?}", err);
@@ -77,7 +79,7 @@ fn handle_messages(
 ) {
     for message in new_messages.iter() {
         let user: ConnectionId = message.source();
-        let user_id = lobby.get_user(&user).clone();
+        let user_id = lobby.get_user(&user).map(|x| x.clone());
         let err = match &**message {
             C2SMessage::Ping => {
                 net.send_message(user, S2CMessage::Pong);
@@ -114,12 +116,13 @@ fn handle_messages(
                 if let Some(room) = room {
                     if room.game.state != GameState::Running {
                         net.send_message(user, S2CMessage::RoomErr(RoomError::NotReady));
-                    } else if &room.game.current_player().user != user_id.unwrap() {
+                    } else if &room.game.current_player().user != &user_id.unwrap() {
                         net.send_message(user, S2CMessage::GameErr(GameError::NotYourTurn));
                     } else {
                         match room.game.pass() {
                             Ok(next_player) => {
-                                lobby.send_to_room(&net, &room.name, S2CMessage::Move(next_player.clone()));
+                                let room_name = room.name.clone();
+                                lobby.send_to_room_by_name(&net, &room_name, S2CMessage::Move(next_player.clone()));
                             }
                             Err(e) => {
                                 net.send_message(user, S2CMessage::GameErr(e));
@@ -133,8 +136,8 @@ fn handle_messages(
             C2SMessage::RematchVote(rematch) => {
                 match lobby.rematch_vote(&user, *rematch) {
                     Ok((count, vote)) => {
-                        net.send_message(user, S2CMessage::RematchVote(user_id.unwrap().to_string(), vote, count));
-                        let room = lobby.get_room_by_user_mut(user_id.unwrap()).unwrap();
+                        net.send_message(user, S2CMessage::RematchVote(user_id.as_ref().unwrap().to_string(), vote, count));
+                        let room = lobby.get_room_by_user_mut(user_id.as_ref().unwrap()).unwrap();
                         if count == 3 {
                             room.game.reset();
                         } else {
@@ -148,9 +151,9 @@ fn handle_messages(
             C2SMessage::SubmitCards(cards) => {
                 match lobby.submit_cards(&user, cards.clone()) {
                     Ok(next_player) => {
-                        let room = lobby.get_room_by_user(user_id.unwrap()).unwrap();
-                        lobby.send_to_room(&net, &room.name, S2CMessage::CardsSubmitted(user_id.unwrap().to_string(), cards.clone()));
-                        lobby.send_to_room(&net, &room.name, S2CMessage::Move(next_player.clone()));
+                        let room = lobby.get_room_by_user(user_id.as_ref().unwrap()).unwrap();
+                        lobby.send_to_room_by_name(&net, &room.name, S2CMessage::CardsSubmitted(user_id.unwrap().to_string(), cards.clone()));
+                        lobby.send_to_room_by_name(&net, &room.name, S2CMessage::Move(next_player.clone()));
                     }
                     Err(e) => {
                         net.send_message(user, S2CMessage::GameErr(e));
@@ -159,8 +162,8 @@ fn handle_messages(
             }
             C2SMessage::Matchmake => {
                 // matchmake_timer = 120; // 重设等待玩家倒计时
-                lobby.waiting_list.push(user_id.unwrap().clone());
-                lobby.user_states.insert(user_id.unwrap().clone(), UserState::Matchmaking);
+                lobby.waiting_list.push(user_id.as_ref().unwrap().clone());
+                lobby.user_states.insert(user_id.as_ref().unwrap().clone(), UserState::Matchmaking);
                 // signals.send(Signal::Matchmake);
             }
             C2SMessage::QueryRoomList => {

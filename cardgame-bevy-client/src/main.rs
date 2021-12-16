@@ -10,12 +10,14 @@ use std::{thread, time, io};
 use std::sync::mpsc::{TryRecvError, Receiver};
 use std::time::{Duration, SystemTime};
 use bevy::app::{ScheduleRunnerPlugin, ScheduleRunnerSettings};
+use regex::Regex;
 use cardgame::Card;
 use cardgame::error::{GameError, RoomError};
 use crate::chat::{ChatMessages, ChatMessage};
 use crate::chat::ChatMessage::SystemMessage;
-use crate::ClientStatus::{Gaming, Idle, WaitingForLandlord};
+use crate::ClientStatus::{Gaming, Idle, NotLoggedIn, WaitingForLandlord};
 use crate::console_plugin::{ConsoleDebugPlugin, InputEvent};
+use crate::logon::login;
 
 #[derive(Clone, PartialEq)]
 struct ConsoleInput(String);
@@ -34,6 +36,7 @@ fn main() {
     app.add_system(handle_network_events.system());
     app.add_system(handle_input.system());
     app.insert_resource(ClientState::default());
+    //app.add_startup_system(login.system());
     register_messages(&mut app);
     app.add_plugin(ScheduleRunnerPlugin::default());
     app.insert_resource(ScheduleRunnerSettings::run_loop(Duration::from_millis(
@@ -67,7 +70,7 @@ fn connect_to_server(mut net: ResMut<NetworkClient>) {
 
 /// 客户端状态
 #[derive(Eq, PartialEq, Clone)]
-enum ClientStatus {
+pub enum ClientStatus {
     /// 未登入
     NotLoggedIn,
 
@@ -87,7 +90,7 @@ enum ClientStatus {
     Gaming,
 }
 
-struct ClientState {
+pub struct ClientState {
     pub cards: Vec<Card>,
     pub user_name: String,
     pub landlord_name: String,
@@ -98,12 +101,34 @@ struct ClientState {
 impl Default for ClientState {
     fn default() -> Self {
         ClientState {
-            status: Idle,
+            status: NotLoggedIn,
             last_packet_time: SystemTime::now(),
             landlord_name: String::default(),
             cards: vec![],
             user_name: String::default(),
         }
+    }
+}
+
+pub fn parse_input(input: &str) -> Option<Vec<Card>> {
+    let input = input
+        .to_ascii_uppercase()
+        .replace("10", "ß")
+        .replace("1", "0")
+        .replace("ß", "1");
+    let cards_regex = Regex::new("([1-9jqkaJQKA]|鬼|王)+").unwrap();
+    let result = cards_regex.find(input.as_str())?;
+    let result = result.as_str().replace("10", "1");
+
+    let mut vec: Vec<Card> = Vec::new();
+    for c in result.chars() {
+        vec.push(Card::from_char(&c));
+    }
+    vec.retain(|&i| i != Card::Unknown);
+    if vec.is_empty() {
+        None
+    } else {
+        Some(vec)
     }
 }
 
@@ -122,11 +147,104 @@ fn handle_input(
                 state.last_packet_time = SystemTime::now();
                 net.send_message(C2SMessage::Ping);
             }
-            _ => {
-                if line.starts_with("join ") {
-
+            "叫地主" => {
+                if state.status != ClientStatus::WaitingForLandlord {
+                    println!("此时还不能叫地主！");
+                } else if state.landlord_name.ne(&state.user_name) {
+                    println!("不是你叫地主！")
                 } else {
-                    println!("Unknown command {}", line);
+                    net.send_message(C2SMessage::ChooseLandlord(true));
+                }
+            }
+            "不叫" => {
+                if state.status != ClientStatus::WaitingForLandlord {
+                    println!("此时还不能叫地主！");
+                } else if state.landlord_name.ne(&state.user_name) {
+                    println!("不是你叫地主！")
+                } else {
+                    net.send_message(C2SMessage::ChooseLandlord(false));
+                }
+            }
+            "再来一局" => {
+                if state.status == ClientStatus::WaitingForRematch {
+                    net.send_message(C2SMessage::RematchVote(true));
+                } else {
+                    println!("此时还不能进行重新比赛投票！");
+                }
+            }
+            "摸了" => {
+                if state.status == ClientStatus::WaitingForRematch {
+                    net.send_message(C2SMessage::RematchVote(false));
+                } else {
+                    println!("此时还不能进行重新比赛投票！");
+                }
+            }
+            "开始游戏" => {
+                match &state.status {
+                    ClientStatus::Idle => {
+                        println!("你还没加入一个房间！");
+                    }
+                    ClientStatus::WaitingForPlayers(room_name) => {
+                        net.send_message(C2SMessage::StartGame(room_name.clone()));
+                    }
+                    _ => {
+                        println!("游戏已开始或无法开始！")
+                    }
+                }
+            }
+            "pass" => {
+                if state.status == ClientStatus::Gaming {
+                    net.send_message(C2SMessage::Pass);
+                } else {
+                    println!("你现在还不能过牌！");
+                }
+            }
+            "匹配" => {
+                if state.status != ClientStatus::Idle {
+                    println!("此时还不能加入匹配队列！");
+                } else {
+                    net.send_message(C2SMessage::Matchmake);
+                }
+            }
+            "游戏列表" => {
+                net.send_message(C2SMessage::QueryRoomList);
+            }
+            _ => {
+                let splitted: Vec<&str> = line.split(" ").collect();
+                match splitted[0] {
+                    "出牌" => {
+                        if state.status == ClientStatus::Gaming {
+                            let str = splitted[1];
+                            let cards = parse_input(str);
+                            if let Some(cards) = cards {
+                                net.send_message(C2SMessage::SubmitCards(cards));
+                            } else {
+                                println!("你没有出任何牌！")
+                            }
+                        } else {
+                            println!("你现在还不能出牌！");
+                        }
+                    }
+                    "join" => {
+                        let room = splitted[1];
+                        if state.status != ClientStatus::Idle {
+                            println!("此时无法加入房间。");
+                            return;
+                        } else {
+                            net.send_message(C2SMessage::JoinRoom(room.to_string()));
+                        }
+                    }
+                    "login" => {
+                        if let Some(user_name) = splitted.get(1) {
+                            state.user_name = user_name.to_string();
+                            net.send_message(C2SMessage::Login(user_name.to_string()));
+                        } else {
+                            println!("Please input a username");
+                        }
+                    }
+                    _ => {
+                        println!("Unknown command {}", line);
+                    }
                 }
             }
         }
@@ -151,7 +269,14 @@ fn handle_incoming_messages(
             }
             S2CMessage::RoomJoined(room) => {
                 println!("加入房间：{}", room);
-                state.status = ClientStatus::WaitingForPlayers(room.to_string());
+                if state.status == Idle {
+                    state.status = ClientStatus::WaitingForPlayers(room.to_string());
+                }
+            }
+            S2CMessage::RoomList(lobbies) => {
+                for name in lobbies.iter() {
+                    print!("{}, ", name)
+                }
             }
             S2CMessage::LandlordMove(landlord) => {
                 let user_name = &state.user_name;
@@ -266,6 +391,10 @@ fn handle_incoming_messages(
                     println!("当前匹配队列共有 {} 位玩家，剩余匹配时间：{}s", count, remaining_time.as_secs());
                 }
             }
+            S2CMessage::LoggedIn => {
+                state.status = Idle;
+                println!("Logged in!");
+            }
             _ => {
                 println!("Other message");
             }
@@ -311,3 +440,4 @@ fn handle_network_events(
 pub mod chat;
 pub mod game_render;
 pub mod console_plugin;
+pub mod logon;
