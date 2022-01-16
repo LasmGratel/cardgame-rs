@@ -127,6 +127,10 @@ fn run_network_thread(
                                 RoomError::NotLandlordPlayer => {
                                     println!("不是你叫地主！");
                                 }
+                                RoomError::RoomFull => {
+                                    println!("房间已满！");
+                                }
+                                _ => {}
                             }
                         }
                         S2CMessage::GameErr(err) => {

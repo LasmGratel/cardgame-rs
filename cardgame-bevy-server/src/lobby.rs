@@ -5,7 +5,6 @@ use cardgame::{Card, Game, GameState, Lobby, Room, RoomState};
 use bimap::{BiHashMap, BiMap};
 use anyhow::Error;
 use bevy_spicy_networking::{ConnectionId, NetworkServer};
-use bevy_spicy_networking::NetworkError;
 use cardgame::error::{GameError, LobbyError, RoomError};
 use cardgame_common::message::S2CMessage;
 use crate::server_network::{MessagePacket, MessageTarget, NetworkManager};
@@ -162,7 +161,7 @@ impl ServerLobby {
                 Ok(())
             }
             MessageTarget::ConnectionId(connection_id) => {
-                net.send_message(connection_id, packet.1)
+                net.send_message(connection_id, packet.1).map_err(anyhow::Error::from)
             }
             MessageTarget::User(user) => {
                 self.network.send_to_user(net, &user, packet.1)
@@ -170,7 +169,7 @@ impl ServerLobby {
             MessageTarget::Room(room) => {
                 self.send_to_room_by_name(net, &room, packet.1)
             }
-        }.map_err(|x| Error::from(x))
+        }
     }
 
     pub fn submit_cards(&mut self, connection_id: &ConnectionId, cards: Vec<Card>) -> Result<String, GameError> {
@@ -242,14 +241,16 @@ impl ServerLobby {
         self.get_room_by_user_mut(&user)
     }
 
-    pub fn send_to_room(&self, net: &NetworkServer, room: &Room, message: S2CMessage) -> Result<(), NetworkError> {
+    pub fn send_to_room(&self, net: &NetworkServer, room: &Room, message: S2CMessage) -> anyhow::Result<()> {
         for user in room.users.iter() {
-            self.network.send_to_user(net, &user, message.clone())?;
+            if let Err(e) = self.network.send_to_user(net, &user, message.clone()) {
+                return Err(anyhow::Error::from(e));
+            }
         }
         Ok(())
     }
 
-    pub fn send_to_room_by_name(&self, net: &NetworkServer, room_name: &str, message: S2CMessage) -> Result<(), NetworkError> {
+    pub fn send_to_room_by_name(&self, net: &NetworkServer, room_name: &str, message: S2CMessage) -> anyhow::Result<()> {
         let room = self.get_room_by_user(room_name).expect("Cannot get room");
         self.send_to_room(net, room, message)
     }

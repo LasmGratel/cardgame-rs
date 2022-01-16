@@ -38,13 +38,13 @@ mod tests {
             let mut cards = CardStore::default();
             let start = Instant::now();
 
-            cards.raw = 1 << 52 - 1;
+            cards.raw = 1 << (52 - 1);
             cards.add(&CardKing);
             cards.add(&CardGhost);
             let duration = start.elapsed();
 
             println!("Time elapsed in expensive_function() is: {:?}", duration);
-            let mut cards = CardStore::default();
+
             let start = Instant::now();
             let cards = gen_cards();
             let duration = start.elapsed();
@@ -64,12 +64,11 @@ mod tests {
 
         #[test]
         fn offset() {
-            let mut cards = CardStore::default();
-            cards.raw = 17i64;
+            let mut cards = CardStore { raw: 17i64 };
             for i in 0..16 {
                 let card = Card::from_value(i);
                 cards.add(&card);
-                let count = cards.get_card_count(&card);
+                let _count = cards.get_card_count(&card);
             }
 
             println!("{:#064b}", cards.raw);
