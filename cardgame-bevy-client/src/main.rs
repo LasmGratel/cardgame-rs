@@ -18,6 +18,7 @@ use crate::chat::ChatMessage::SystemMessage;
 use crate::ClientStatus::{Gaming, Idle, NotLoggedIn, WaitingForLandlord};
 use crate::console_plugin::{ConsoleDebugPlugin, InputEvent};
 use crate::logon::login;
+use crate::ui::UIPlugin;
 
 #[derive(Clone, PartialEq)]
 struct ConsoleInput(String);
@@ -30,7 +31,8 @@ fn main() {
     // You need to add the `ClientPlugin` first before you can register
     // `ClientMessage`s
     app.add_plugin(bevy_spicy_networking::ClientPlugin::default());
-    app.add_plugin(ConsoleDebugPlugin);
+    // app.add_plugin(ConsoleDebugPlugin);
+    app.add_plugin(UIPlugin);
     app.add_startup_system(connect_to_server.system());
     app.add_system(handle_incoming_messages.system());
     app.add_system(handle_network_events.system());
@@ -441,3 +443,4 @@ pub mod chat;
 pub mod game_render;
 pub mod console_plugin;
 pub mod logon;
+pub(crate) mod ui;
